@@ -13,7 +13,7 @@ class Signals:
         self._recentTwitchMessages = []
         self._history = []
 
-        # This flag indicates to all threads that they should immediately terminate
+        # Este flag indica a todos los hilos que deben terminar inmediatamente
         self._terminate = False
 
         self.sio_queue = queue.SimpleQueue()

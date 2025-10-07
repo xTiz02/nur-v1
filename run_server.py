@@ -5,8 +5,8 @@ import time
 import threading
 import asyncio
 
-from modules.impl.bot import DiscordClient
-from modules.service.stt.stt_google import GoogleSTTEngine
+from src.modules.discord.bot import DiscordClient
+from src.modules.stt.stt_google import GoogleSTTEngine
 # Class Imports
 from utils.signals import Signals
 # from prompter import Prompter
@@ -15,12 +15,12 @@ from utils.signals import Signals
 # from llmWrappers.imageLLMWrapper import ImageLLMWrapper
 # from stt import STT
 # from tts import TTS
-# from modules.twitchClient import TwitchClient
-# from modules.audioPlayer import AudioPlayer
-# from modules.vtubeStudio import VtubeStudio
-# from modules.multimodal import MultiModal
-# from modules.customPrompt import CustomPrompt
-# from modules.memory import Memory
+# from src.twitchClient import TwitchClient
+# from src.audioPlayer import AudioPlayer
+# from src.vtubeStudio import VtubeStudio
+# from src.multimodal import MultiModal
+# from src.customPrompt import CustomPrompt
+# from src.memory import Memory
 # from socketioServer import SocketIOServer
 
 
@@ -53,31 +53,31 @@ async def main():
     # Create LLMWrappers
     # llmState = LLMState()
     # llms = {
-    #     "text": TextLLMWrapper(signals, tts, llmState, modules),
-    #     "image": ImageLLMWrapper(signals, tts, llmState, modules)
+    #     "text": TextLLMWrapper(signals, tts, llmState, src),
+    #     "image": ImageLLMWrapper(signals, tts, llmState, src)
     # }
     # Create Prompter
-    # prompter = Prompter(signals, llms, modules)
+    # prompter = Prompter(signals, llms, src)
 
     # Create Discord bot
     stt = GoogleSTTEngine()
     modules['discord'] = DiscordClient(signals, stt, enabled=False)
     # Create Twitch bot
-    # modules['twitch'] = TwitchClient(signals, enabled=False)
+    # src['twitch'] = TwitchClient(signals, enabled=False)
     # Create audio player
-    # modules['audio_player'] = AudioPlayer(signals, enabled=True)
+    # src['audio_player'] = AudioPlayer(signals, enabled=True)
     # Create Vtube Studio plugin
-    # modules['vtube_studio'] = VtubeStudio(signals, enabled=True)
+    # src['vtube_studio'] = VtubeStudio(signals, enabled=True)
     # Create Multimodal module
-    # modules['multimodal'] = MultiModal(signals, enabled=False)
+    # src['multimodal'] = MultiModal(signals, enabled=False)
     # Create Custom Prompt module
-    # modules['custom_prompt'] = CustomPrompt(signals, enabled=True)
+    # src['custom_prompt'] = CustomPrompt(signals, enabled=True)
     # Create Memory module
-    # modules['memory'] = Memory(signals, enabled=True)
+    # src['memory'] = Memory(signals, enabled=True)
 
     # Create Socket.io server
     # The specific llmWrapper it gets doesn't matter since state is shared between all llmWrappers
-    # sio = SocketIOServer(signals, stt, tts, llms["text"], prompter, modules=modules)
+    # sio = SocketIOServer(signals, stt, tts, llms["text"], prompter, src=src)
 
     # Create threads (As daemons, so they exit when the main thread exits)
     # prompter_thread = threading.Thread(target=prompter.prompt_loop, daemon=True)
@@ -100,7 +100,7 @@ async def main():
 
     # Wait for child threads to exit before exiting main thread
 
-    # Wait for all modules to finish
+    # Wait for all src to finish
     for module_thread in module_threads.values():
         module_thread.join()
 

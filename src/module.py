@@ -1,5 +1,5 @@
 import asyncio
-from modules.injection import Injection
+from src.injection import Injection
 
 '''
 Una clase extensible que define un módulo que interactúa con el programa principal.
