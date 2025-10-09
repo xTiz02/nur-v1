@@ -3,9 +3,9 @@ import queue
 
 class Signals:
     def __init__(self):
-        self._human_speaking = False
-        self._AI_speaking = False
-        self._AI_thinking = False
+        self._human_speaking = False # Manejado por hilos
+        self._AI_speaking = False # Manejado por hilos
+        self._AI_thinking = False # Manejado por hilos
         self._last_message_time = 0.0
         self._new_message = False
         self._tts_ready = False
