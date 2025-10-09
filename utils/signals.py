@@ -1,5 +1,6 @@
-import queue
-
+from typing import Any, Tuple
+from queue import Queue
+from constans import EventType
 
 class Signals:
     def __init__(self):
@@ -10,13 +11,12 @@ class Signals:
         self._new_message = False
         self._tts_ready = False
         self._stt_ready = False
-        self._recentTwitchMessages = []
+        # self._recentTwitchMessages = []
         self._history = []
 
-        # Este flag indica a todos los hilos que deben terminar inmediatamente
-        self._terminate = False
-
-        self.sio_queue = queue.SimpleQueue()
+        self._terminate = False # Este flag indica a todos los hilos que deben terminar inmediatamente
+        SignalQueue = Queue[Tuple[EventType, Any]]
+        self.sio_queue: SignalQueue = Queue()
 
     @property
     def human_speaking(self):
@@ -25,7 +25,7 @@ class Signals:
     @human_speaking.setter
     def human_speaking(self, value):
         self._human_speaking = value
-        self.sio_queue.put(('human_speaking', value))
+        self.sio_queue.put((EventType.HUMAN_SPEAKING, value))
         if value:
             print("SIGNALS: Human Talking Start")
         else:
@@ -38,7 +38,7 @@ class Signals:
     @AI_speaking.setter
     def AI_speaking(self, value):
         self._AI_speaking = value
-        self.sio_queue.put(('AI_speaking', value))
+        self.sio_queue.put((EventType.AI_SPEAKING, value))
         if value:
             print("SIGNALS: AI Talking Start")
         else:
@@ -51,7 +51,7 @@ class Signals:
     @AI_thinking.setter
     def AI_thinking(self, value):
         self._AI_thinking = value
-        self.sio_queue.put(('AI_thinking', value))
+        self.sio_queue.put((EventType.AI_THINKING, value))
         if value:
             print("SIGNALS: AI Thinking Start")
         else:
@@ -91,14 +91,14 @@ class Signals:
     def stt_ready(self, value):
         self._stt_ready = value
 
-    @property
-    def recentTwitchMessages(self):
-        return self._recentTwitchMessages
+    # @property
+    # def recentTwitchMessages(self):
+    #     return self._recentTwitchMessages
 
-    @recentTwitchMessages.setter
-    def recentTwitchMessages(self, value):
-        self._recentTwitchMessages = value
-        self.sio_queue.put(('recent_twitch_messages', value))
+    # @recentTwitchMessages.setter
+    # def recentTwitchMessages(self, value):
+    #     self._recentTwitchMessages = value
+    #     self.sio_queue.put(('recent_twitch_messages', value))
 
     @property
     def history(self):

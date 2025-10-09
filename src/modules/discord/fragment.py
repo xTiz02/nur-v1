@@ -22,7 +22,7 @@ class FragmentManager:
     def process_fragment(self, user, fragment: str):
         """Agrega fragmento al buffer del usuario o lo guarda en pendiente si la IA está hablando"""
         if self.signals.AI_speaking or self.signals.AI_thinking:
-            print(f"[DEBUG] IA hablando, guardando en buffer pendiente: {fragment}")
+            print(f"[DEBUG] IA hablando O pensando, guardando en buffer pendiente: {fragment}")
             user_id = user.id
             if user_id not in self._pending_fragment:
                 self._pending_fragment[user_id] = UserMessages(user=user, fragments=[])
