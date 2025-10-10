@@ -4,7 +4,7 @@ from enum import Enum
 
 class EventType(Enum):
     # Eventos del humano
-    HUMAN_SPEAKING: str = "human_speaking"
+    HUMAN_SPEAKING = "human_speaking"
 
     # Eventos del AI
     AI_SPEAKING = "ai_speaking"
