@@ -28,13 +28,53 @@ class FragmentManager:
                 self._pending_fragment[user_id] = UserMessages(user=user, fragments=[])
             self._pending_fragment[user_id].fragments.append(Fragment(text=fragment))
         else:
-            self.add_fragment(user, fragment)
+            print(f"[DEBUG] Agregando fragmento al buffer del usuario {user.display_name}: {fragment}")
+            user_id = user.id
+            if user_id not in self._user_buffers:
+                self._user_buffers[user_id] = UserMessages(user=user, fragments=[])
+            self._user_buffers[user_id].fragments.append(Fragment(text=fragment))
 
-    def add_fragment(self, user, text: str):
-        """Agrega fragmento al buffer del usuario"""
-        user_id = user.id
+    def get_full_fragments(self) -> dict[str, List[str]]:
+        """Retorna y limpia todos los buffers de usuarios y pendientes"""
+        full_fragments = {}
+        for user_id in list(self._pending_fragment.keys()):
+            pending_frags = self._flush_pending_buffers(user_id)
+            if pending_frags:
+                full_fragments.update(pending_frags)
+                del self._pending_fragment[user_id]
+        for user_id in list(self._user_buffers.keys()):
+            user_frags = self._flush_user_buffer(user_id)
+            if user_frags:
+                full_fragments.update(user_frags)
+                del self._user_buffers[user_id]
+        self._user_buffers = {}
+        self._pending_fragment = {}
+        return full_fragments
 
-        # Acumular en buffer
-        if user_id not in self._user_buffers:
-            self._user_buffers[user_id] = UserMessages(user=user, fragments=[])
-        self._user_buffers[user_id].fragments.append(Fragment(text=text))
+    def _flush_user_buffer(self, user_id) -> dict[str, List[str]]:
+        """Retorna cada fragmento del usuario como elementos separados en una lista"""
+        if user_id not in self._user_buffers or not self._user_buffers[user_id].fragments:
+            return {}
+        user_name = self._user_buffers[user_id].user.display_name
+        print(f"[DEBUG] Agregando fragmentos del usuario {user_name} al historial")
+        fragments = [frag.text for frag in self._user_buffers[user_id].fragments]
+        return {user_name: fragments}
+
+    def _flush_pending_buffers(self,user_id) -> dict[str, List[str]]:
+        """Retorna cada fragmento pendiente del usuario como elementos separados en una lista"""
+        if user_id in self._pending_fragment or not self._pending_fragment[user_id].fragments:
+            return {}
+        user_name = self._pending_fragment[user_id].user.display_name
+        print(f"[DEBUG] Agregando fragmentos pendientes para usuario {user_name}")
+        pending_frags = [frag.text for frag in self._pending_fragment[user_id].fragments]
+        return {user_name: pending_frags}
+
+    @property
+    def get_user_buffers(self):
+        return self._user_buffers
+
+    @property
+    def get_pending_buffers(self):
+        return self._pending_fragment
+
+

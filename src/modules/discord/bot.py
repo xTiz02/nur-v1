@@ -5,6 +5,7 @@ from src.module import Module
 import env
 import speech_recognition as sr
 
+from src.modules.discord.custom_sink import LoggingSpeechRecognitionSink
 from src.modules.discord.fragment import FragmentManager
 from src.modules.stt.stt_interface import STTInterface
 from utils.constans import EventType
@@ -12,51 +13,14 @@ from utils.constans import EventType
 def make_recognizer():
     print("[DEBUG] Creando recognizer de SpeechRecognition")
     r = sr.Recognizer()
-    r.energy_threshold = 200
-    r.dynamic_energy_threshold = True
-    r.pause_threshold = 4.0
-    r.phrase_threshold = 1.2
-    r.non_speaking_duration = 0.8
+    r.energy_threshold = 200 # Nivel mínimo de volumen para detectar voz (ajusta según pruebas)
+    r.dynamic_energy_threshold = True # Se adapta al ruido de fondo
+    r.pause_threshold = 4.0 # Tiempo de silencio antes de cortar frase
+    r.phrase_threshold = 1.2 # Tiempo mínimo de voz para considerarlo frase
+    r.non_speaking_duration = 0.8 # Silencios muy cortos los ignora
     return r
 
 
-# ----------- Sink personalizado con logs -----------
-class LoggingSpeechRecognitionSink(voice_recv.extras.speechrecognition.SpeechRecognitionSink):
-
-    def __init__(self, *args, signals=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.signals = signals
-
-    @voice_recv.AudioSink.listener()
-    def on_voice_member_speaking_start(self, member: discord.Member):
-        print(f"{member.display_name} empezó a hablar")
-        if self.signals:
-            self.signals.sio_queue.put((EventType.HUMAN_SPEAKING, True))
-
-    @voice_recv.AudioSink.listener()
-    def on_voice_member_speaking_stop(self, member: discord.Member):
-        print(f"{member.display_name} dejó de hablar")
-        if self.signals:
-            self.signals.sio_queue.put((EventType.HUMAN_SPEAKING, False))
-        # # Si ya había un timer corriendo, cancelarlo
-        # if member in silence_timers and not silence_timers[member].done():
-        #   silence_timers[member].cancel()
-        #
-        # # Nuevo timer para cerrar buffer después de silencio prolongado
-        # async def silence_wait():
-        #   try:
-        #     await asyncio.sleep(1.5)  # tiempo de silencio para confirmar fin de frase
-        #     full_text = flush_user_buffer(member)
-        #     if full_text:
-        #       got_text(member, full_text)
-        #   except asyncio.CancelledError:
-        #     pass
-        #
-        # silence_timers[member] = loop.create_task(silence_wait())
-
-    @voice_recv.AudioSink.listener()
-    def on_voice_member_disconnect(self, member: discord.Member, ssrc: int | None):
-        print(f"{member.display_name} se desconectó del canal (ssrc={ssrc})")
 
 class DiscordClient(Module):
     def __init__(self, signals, stt: STTInterface, manager: FragmentManager, enabled=True):
