@@ -28,7 +28,7 @@ class LoggingSpeechRecognitionSink(voice_recv.extras.speechrecognition.SpeechRec
             last_fragment_time = fragments[-1].timestamp
             if current_time - last_fragment_time >= 4.0:
                 full_fragments = self.manager.get_full_fragments() # Obtiene los fragmentos completos
-
+                
         # # Si ya había un timer corriendo, cancelarlo
         # if member in silence_timers and not silence_timers[member].done():
         #   silence_timers[member].cancel()

@@ -6,7 +6,6 @@ Las inyecciones se añaden al mensaje de menor a mayor prioridad, siendo la más
 La prioridad es un número entero positivo. Las inyecciones con prioridad negativa se ignorarán.
 Prioridad del mensaje del sistema: 10
 Historial de mensajes: 50
-Chat de Twitch: 100
 '''
 
 

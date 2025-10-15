@@ -1,6 +1,9 @@
-from typing import Any, Tuple
+from typing import Any, Tuple, List
 from queue import Queue
-from constans import EventType
+
+from src.com.model.enums import EventType
+from src.com.model.models import HistoryData
+
 
 class Signals:
     def __init__(self):
@@ -12,7 +15,7 @@ class Signals:
         self._tts_ready = False
         self._stt_ready = False
         # self._recentTwitchMessages = []
-        self._history = []
+        self._history:List[HistoryData] = []
 
         self._terminate = False # Este flag indica a todos los hilos que deben terminar inmediatamente
         SignalQueue = Queue[Tuple[EventType, Any]]

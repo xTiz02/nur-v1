@@ -1,16 +1,7 @@
-import time
-from dataclasses import dataclass
 from typing import Any, List
 
-@dataclass
-class Fragment:
-    text: str
-    timestamp: float = time.time()
+from src.com.model.models import UserMessages, Fragment
 
-@dataclass
-class UserMessages:
-    user: Any
-    fragments: List[Fragment] = None
 
 class FragmentManager:
     def __init__(self, signals):
@@ -41,14 +32,10 @@ class FragmentManager:
             pending_frags = self._flush_pending_buffers(user_id)
             if pending_frags:
                 full_fragments.update(pending_frags)
-                del self._pending_fragment[user_id]
         for user_id in list(self._user_buffers.keys()):
             user_frags = self._flush_user_buffer(user_id)
             if user_frags:
                 full_fragments.update(user_frags)
-                del self._user_buffers[user_id]
-        self._user_buffers = {}
-        self._pending_fragment = {}
         return full_fragments
 
     def _flush_user_buffer(self, user_id) -> dict[str, List[str]]:
@@ -68,6 +55,11 @@ class FragmentManager:
         print(f"[DEBUG] Agregando fragmentos pendientes para usuario {user_name}")
         pending_frags = [frag.text for frag in self._pending_fragment[user_id].fragments]
         return {user_name: pending_frags}
+
+    def clear_buffers(self):
+        """Limpia todos los buffers de usuarios y pendientes"""
+        self._user_buffers = {}
+        self._pending_fragment = {}
 
     @property
     def get_user_buffers(self):
