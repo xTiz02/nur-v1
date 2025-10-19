@@ -5,17 +5,14 @@ from typing import Any, List
 
 @dataclass
 class Fragment:
-    text: str
-    timestamp: float = time.time()
-
-@dataclass
-class UserMessages:
-    user: Any
-    fragments: List[Fragment]
+    user_id: str
+    display_name: str
+    message: str
+    timestamp: float
 
 @dataclass
 class HistoryData:
-    user_messages: List[UserMessages]
+    user_messages: List[Fragment]
     image_path: str
     is_multimodal: bool
     ai_response: str

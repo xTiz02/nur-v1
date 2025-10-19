@@ -20,6 +20,7 @@ class Signals:
         self._terminate = False # Este flag indica a todos los hilos que deben terminar inmediatamente
         SignalQueue = Queue[Tuple[EventType, Any]]
         self.sio_queue: SignalQueue = Queue()
+        self._process_text = False
 
     @property
     def human_speaking(self):
@@ -94,6 +95,12 @@ class Signals:
     def stt_ready(self, value):
         self._stt_ready = value
 
+    @property
+    def process_text(self):
+        return self._process_text
+    @process_text.setter
+    def process_text(self, value):
+        self._process_text = value
     # @property
     # def recentTwitchMessages(self):
     #     return self._recentTwitchMessages

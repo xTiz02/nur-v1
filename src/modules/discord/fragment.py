@@ -1,72 +1,71 @@
-from typing import Any, List
+import time
+from typing import Any
 
-from src.com.model.models import UserMessages, Fragment
+from src.com.model.models import Fragment
 
-
+'''
+Esta clase es responsable de gestionar los fragmentos de mensajes recibidos de los usuarios.
+Por cualquier interfaz (Discord, Twitch, etc.), mientras sea texto.
+'''
 class FragmentManager:
     def __init__(self, signals):
-        self._user_buffers: dict[Any, UserMessages] = {}  # Diccionario para almacenar dialogo por usuario
-        # self._user_timers = {}
+        # Mensajes normales y pendientes
+        self._current_messages: list[Fragment] = []
+        self._pending_messages: list[Fragment] = []
+        # Historial total (todos los mensajes)
+        self._all_messages: list[Fragment] = []
         self.signals = signals
-        self._pending_fragment: dict[Any, UserMessages] = {}  # Dialogo que llega mientras habla la IA
 
     def process_fragment(self, user, fragment: str):
-        """Agrega fragmento al buffer del usuario o lo guarda en pendiente si la IA está hablando"""
+        """Guarda cada fragmento de usuario en su lista correspondiente"""
+        message_data = Fragment(
+            user_id=user.id,
+            display_name=user.display_name,
+            message=fragment,timestamp=time.time())
+
         if self.signals.AI_speaking or self.signals.AI_thinking:
-            print(f"[DEBUG] IA hablando O pensando, guardando en buffer pendiente: {fragment}")
-            user_id = user.id
-            if user_id not in self._pending_fragment:
-                self._pending_fragment[user_id] = UserMessages(user=user, fragments=[])
-            self._pending_fragment[user_id].fragments.append(Fragment(text=fragment))
+            print(f"[DEBUG] IA hablando/pensando. Guardando pendiente: {fragment}")
+            self._pending_messages.append(message_data)
         else:
-            print(f"[DEBUG] Agregando fragmento al buffer del usuario {user.display_name}: {fragment}")
-            user_id = user.id
-            if user_id not in self._user_buffers:
-                self._user_buffers[user_id] = UserMessages(user=user, fragments=[])
-            self._user_buffers[user_id].fragments.append(Fragment(text=fragment))
+            print(f"[DEBUG] Agregando mensaje actual de {message_data.display_name}: {fragment}")
+            self._current_messages.append(message_data)
+            self.signals.new_message = True
 
-    def get_full_fragments(self) -> dict[str, List[str]]:
-        """Retorna y limpia todos los buffers de usuarios y pendientes"""
-        full_fragments = {}
-        for user_id in list(self._pending_fragment.keys()):
-            pending_frags = self._flush_pending_buffers(user_id)
-            if pending_frags:
-                full_fragments.update(pending_frags)
-        for user_id in list(self._user_buffers.keys()):
-            user_frags = self._flush_user_buffer(user_id)
-            if user_frags:
-                full_fragments.update(user_frags)
-        return full_fragments
+        # Registrar en el historial general
+        self._all_messages.append(message_data)
 
-    def _flush_user_buffer(self, user_id) -> dict[str, List[str]]:
-        """Retorna cada fragmento del usuario como elementos separados en una lista"""
-        if user_id not in self._user_buffers or not self._user_buffers[user_id].fragments:
-            return {}
-        user_name = self._user_buffers[user_id].user.display_name
-        print(f"[DEBUG] Agregando fragmentos del usuario {user_name} al historial")
-        fragments = [frag.text for frag in self._user_buffers[user_id].fragments]
-        return {user_name: fragments}
+    def get_full_fragments(self) -> dict[str, list[Fragment]]:
+        """Retorna los fragmentos actuales y pendientes ordenados por timestamp (descendente)"""
+        def sort_by_time(messages: list[Fragment]) -> list[Fragment]:
+            return sorted(messages, key=lambda x: x.timestamp, reverse=False)
 
-    def _flush_pending_buffers(self,user_id) -> dict[str, List[str]]:
-        """Retorna cada fragmento pendiente del usuario como elementos separados en una lista"""
-        if user_id in self._pending_fragment or not self._pending_fragment[user_id].fragments:
-            return {}
-        user_name = self._pending_fragment[user_id].user.display_name
-        print(f"[DEBUG] Agregando fragmentos pendientes para usuario {user_name}")
-        pending_frags = [frag.text for frag in self._pending_fragment[user_id].fragments]
-        return {user_name: pending_frags}
+        return {
+            "pending": sort_by_time(self._pending_messages),
+            "current": sort_by_time(self._current_messages)
+        }
+
+    def get_last_message(self) -> Fragment | None:
+        """Retorna el último mensaje recibido (de cualquier usuario o estado)"""
+        if not self._all_messages:
+            return None
+        # El más reciente por timestamp
+        return max(self._all_messages, key=lambda x: x.timestamp)
 
     def clear_buffers(self):
-        """Limpia todos los buffers de usuarios y pendientes"""
-        self._user_buffers = {}
-        self._pending_fragment = {}
+        """Limpia todas las listas"""
+        self._current_messages.clear()
+        self._pending_messages.clear()
+        self._all_messages.clear()
 
     @property
-    def get_user_buffers(self):
-        return self._user_buffers
+    def all_messages(self):
+        """Retorna el historial"""
+        return self._all_messages
 
     @property
-    def get_pending_buffers(self):
-        return self._pending_fragment
+    def pending_messages(self):
+        return self._pending_messages
 
-
+    @property
+    def current_messages(self):
+        return self._current_messages

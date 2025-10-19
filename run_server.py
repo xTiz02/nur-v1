@@ -6,7 +6,9 @@ import threading
 import asyncio
 
 from src.modules.discord.bot import DiscordClient
+from src.modules.discord.fragment import FragmentManager
 from src.modules.stt.stt_google import GoogleSTTEngine
+from src.prompter import Prompter
 # Class Imports
 from utils.signals import Signals
 # from prompter import Prompter
@@ -24,6 +26,23 @@ from utils.signals import Signals
 # from socketioServer import SocketIOServer
 
 
+def run_discord_bot(signals, stt, fragment_manager):
+    """Función que corre el bot en un hilo separado con su propio event loop"""
+    async def runner():
+        bot = DiscordClient(signals, stt, fragment_manager, enabled=False)
+        await bot.run()
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(runner())
+    except Exception as e:
+        print(f"[ERROR] Discord bot loop terminó con error: {e}")
+    finally:
+        loop.close()
+        print("[INFO] Discord bot loop cerrado.")
+
+
 async def main():
     print("Starting Project...")
 
@@ -33,8 +52,8 @@ async def main():
         signals.terminate = True
         # stt.API.shutdown()
 
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler) # Ctrl+C
+    signal.signal(signal.SIGTERM, signal_handler) # Terminar proceso desde el SO (o Docker)
 
     # CORE FILES
 
@@ -57,11 +76,19 @@ async def main():
     #     "image": ImageLLMWrapper(signals, tts, llmState, src)
     # }
     # Create Prompter
-    # prompter = Prompter(signals, llms, src)
+    fragment_manager = FragmentManager(signals)
+    prompter = Prompter(signals, None,fragment_manager, None)
 
     # Create Discord bot
     stt = GoogleSTTEngine()
-    modules['discord'] = DiscordClient(signals, stt, enabled=False)
+    # modules['discord'] = DiscordClient(signals, stt,fragment_manager, enabled=False)
+    # Hilo del bot
+    bot_thread = threading.Thread(
+        target=run_discord_bot, args=(signals, stt, fragment_manager), daemon=True
+    )
+    bot_thread.start()
+    # discord_bot = DiscordClient(signals, stt,fragment_manager, enabled=False)
+    # await discord_bot.run()
     # Create Twitch bot
     # src['twitch'] = TwitchClient(signals, enabled=False)
     # Create audio player
@@ -80,19 +107,19 @@ async def main():
     # sio = SocketIOServer(signals, stt, tts, llms["text"], prompter, src=src)
 
     # Create threads (As daemons, so they exit when the main thread exits)
-    # prompter_thread = threading.Thread(target=prompter.prompt_loop, daemon=True)
+    prompter_thread = threading.Thread(target=prompter.prompt_loop, daemon=True)
     # stt_thread = threading.Thread(target=stt.listen_loop, daemon=True)
     # sio_thread = threading.Thread(target=sio.start_server, daemon=True)
     # Start Threads
     # sio_thread.start()
-    # prompter_thread.start()
+    prompter_thread.start()
     # stt_thread.start()
 
     # Crear 1 hilo por cada módulo
-    for name, module in modules.items():
-        module_thread = threading.Thread(target=module.init_event_loop, daemon=True)
-        module_threads[name] = module_thread
-        module_thread.start()
+    # for name, module in modules.items():
+    #     module_thread = threading.Thread(target=module.init_event_loop, daemon=True)
+    #     module_threads[name] = module_thread
+    #     module_thread.start()
 
     while not signals.terminate:
         time.sleep(0.1)
@@ -106,7 +133,7 @@ async def main():
 
     # sio_thread.join()
     # print("SIO EXITED ======================")
-    # prompter_thread.join()
+    prompter_thread.join()
     # print("PROMPTER EXITED ======================")
     # stt_thread.join()
     # print("STT EXITED ======================")

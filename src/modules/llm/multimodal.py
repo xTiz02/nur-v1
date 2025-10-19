@@ -1,4 +1,6 @@
-from modules.module import Module
+from src.com.model.enums import MultiModalEventType
+from src.module import Module
+from utils.constans import MULTIMODAL_STRATEGY
 
 
 class MultiModal(Module):
@@ -32,14 +34,14 @@ class MultiModal(Module):
         def get_multimodal_status(self):
             return self.outer.enabled
 
-        # Determines when a prompt should go to the multimodal model
+        # Determina cuándo un prompt debe ir al modelo multimodal
         def multimodal_now(self):
             if not self.outer.enabled:
                 return False
 
-            if MULTIMODAL_STRATEGY == "never":
+            if MULTIMODAL_STRATEGY == MultiModalEventType.NORMAL:
                 return self.outer.strategy_never()
-            elif MULTIMODAL_STRATEGY == "always":
+            elif MULTIMODAL_STRATEGY == MultiModalEventType.MULTI_MODAL:
                 return self.outer.strategy_always()
             else:
                 return False

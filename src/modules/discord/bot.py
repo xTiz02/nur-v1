@@ -1,6 +1,10 @@
 import os
+import time
+
 import discord
 from discord.ext import commands, voice_recv
+
+from src.com.model.enums import EventType
 from src.module import Module
 import env
 import speech_recognition as sr
@@ -8,7 +12,6 @@ import speech_recognition as sr
 from src.modules.discord.custom_sink import LoggingSpeechRecognitionSink
 from src.modules.discord.fragment import FragmentManager
 from src.modules.stt.stt_interface import STTInterface
-from utils.constans import EventType
 
 def make_recognizer():
     print("[DEBUG] Creando recognizer de SpeechRecognition")
@@ -20,8 +23,6 @@ def make_recognizer():
     r.non_speaking_duration = 0.8 # Silencios muy cortos los ignora
     return r
 
-
-
 class DiscordClient(Module):
     def __init__(self, signals, stt: STTInterface, manager: FragmentManager, enabled=True):
         super().__init__(signals, enabled)
@@ -29,6 +30,7 @@ class DiscordClient(Module):
         self.manager = manager
 
     def _process_audio(self, recognizer: sr.Recognizer, audio: sr.AudioData, user):
+        self.signals.process_text = True
         print(f"[DEBUG] _process_audio() llamado para usuario {user.display_name}")
         try:
             text = self.stt.transcribe(recognizer, audio, user.display_name)
@@ -37,6 +39,7 @@ class DiscordClient(Module):
                 self.manager.process_fragment(user, text)
         except Exception as e:
             print(f"[ERROR] Fallo en _process_audio: {e}")
+        self.signals.process_text = False
         return None
 
     async def run(self):
@@ -53,11 +56,11 @@ class DiscordClient(Module):
 
         @bot.command(name="ping", description="Check the bot's status")
         async def ping(ctx):
-            await ctx.respond(f"Pong! {bot.latency}")
+            await ctx.send(f"Pong! {bot.latency}")
 
-        async def finished_callback(sink, channel: discord.TextChannel, *args):
-            await sink.vc.disconnect()
-            await channel.send("Finished!")
+        # async def finished_callback(sink, channel: discord.TextChannel, *args):
+        #     await sink.vc.disconnect()
+        #     await channel.send("Finished!")
 
         @bot.command(name="start", description="Bot will join your vc")
         async def start(ctx):
@@ -72,10 +75,12 @@ class DiscordClient(Module):
 
                 sink = LoggingSpeechRecognitionSink(
                     process_cb=lambda recognizer, audio, user: self._process_audio(recognizer, audio, user),
+                    text_cb=lambda u, t: None,  # desactivamos text_cb directo
                     default_recognizer="google",
                     phrase_time_limit=60,
                     recognizer_factory=make_recognizer,
-                    signals=self.signals
+                    signals=self.signals,
+                    manager=self.manager
                 )
 
                 print("[DEBUG] Iniciando escucha con SpeechRecognitionSink...")
@@ -86,14 +91,13 @@ class DiscordClient(Module):
                 await ctx.send("No estás en un canal de voz.")
 
         @bot.command(name="stop", description="Bot will exit the vc")
-        async def stop(ctx: discord.ApplicationContext):
+        async def stop(ctx):
             """Stop recording."""
-            if ctx.guild.id in connections:
-                vc = connections[ctx.guild.id]
-                vc.stop_recording()
+            if ctx.guild.id in connections and ctx.voice_client:
                 del connections[ctx.guild.id]
-                await ctx.delete()
+                await ctx.voice_client.disconnect()
             else:
-                await ctx.respond("Not recording in this guild.")
+                await ctx.send("Not recording in this guild.")
 
-        bot.run(env.TOKEN)
+        await bot.start(env.TOKEN)
+        # bot.run(env.TOKEN)
