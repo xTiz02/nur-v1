@@ -1,16 +1,23 @@
 import copy
 import json
 import time
-from utils.constans import *
+from abc import abstractmethod
 
+from env import MODEL_NAME
+from utils.constans import *
+import vertexai
+from vertexai.generative_models import GenerativeModel, HarmCategory, HarmBlockThreshold, GenerationConfig
+import env
 from src.injection import Injection
 
 
 class AbstractLLMWrapper:
 
-    def __init__(self, signals, tts, llmState, modules=None):
+    def __init__(self, signals, tts, llmState,agent, modules=None):
         self.signals = signals
         self.llmState = llmState
+        self.agent = agent
+
         self.tts = tts
         self.API = self.API(self)
         if modules is None:
@@ -20,10 +27,32 @@ class AbstractLLMWrapper:
 
 
         #Below constants must be set by child classes
-        self.SYSTEM_PROMPT = None
-        self.LLM_ENDPOINT = None
+        # Constantes deben ser establecidas por las clases hijas
+
+        # self.LLM_ENDPOINT = None
         self.CONTEXT_SIZE = None
-        self.tokenizer = None
+        # self.tokenizer = None
+
+        vertexai.init(project=env.PROJECT_ID, location=env.REGION)
+
+        # Configuración de seguridad más permisiva
+        self.safety_settings = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        }
+
+        # Configura modelo y sesión de chat
+        self.model = GenerativeModel(
+            model_name=env.MODEL_NAME,
+            system_instruction=SYSTEM_PROMPT,
+            generation_config=GenerationConfig(
+                temperature=0.7,
+                max_output_tokens=512,
+            ),
+            safety_settings=self.safety_settings
+        )
 
     # Basic filter to check if a message contains a word in the blacklist
     def is_filtered(self, text):
@@ -95,6 +124,7 @@ class AbstractLLMWrapper:
                 messages.pop(0)
                 print("Prompt too long, removing earliest message")
 
+    @abstractmethod
     def prepare_payload(self):
         raise NotImplementedError("Must implement prepare_payload in child classes")
 

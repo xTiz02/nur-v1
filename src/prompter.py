@@ -54,7 +54,6 @@ class Prompter:
                     print("SYSTEM READY")
                     self.system_ready = True
 
-            # self.timeSinceLastMessage = time.time() - self.signals.last_message_time
             # Calcular el tiempo desde el último mensaje
             if self.signals.new_message:
                 last_fragment = self.manager.get_last_message()
@@ -71,9 +70,8 @@ class Prompter:
                     self.signals.history.append(full_fragments)
                     self.manager.clear_buffers()
                     print(f"[DEBUG] Fragmentos finales completos enviados al historial: {self.signals.history}")
-                # llm_wrapper = self.choose_llm()
-                # llm_wrapper.prompt()
+
+                llm_wrapper = self.choose_llm()
+                llm_wrapper.prompt()
 
                 self.signals.new_message = False
-                # self.signals.last_message_time = time.time()
-            # Sleep for 0.1 seconds before checking again.

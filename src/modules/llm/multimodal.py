@@ -40,8 +40,10 @@ class MultiModal(Module):
                 return False
 
             if MULTIMODAL_STRATEGY == MultiModalEventType.NORMAL:
+                print(f"Multimodal Strategy: NORMAL")
                 return self.outer.strategy_never()
             elif MULTIMODAL_STRATEGY == MultiModalEventType.MULTI_MODAL:
+                print(f"Multimodal Strategy: MULTI_MODAL")
                 return self.outer.strategy_always()
             else:
                 return False

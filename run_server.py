@@ -4,9 +4,14 @@ import sys
 import time
 import threading
 import asyncio
-
+from utils.constans import *
+import env
+from src.com.wrapper.image_llm_wrapper import ImageLLMWrapper
+from src.com.wrapper.text_llm_wrapper import TextLLMWrapper
 from src.modules.discord.bot import DiscordClient
 from src.modules.discord.fragment import FragmentManager
+from src.modules.llm.multimodal import MultiModal
+from src.modules.llm.vertext_llm import VertexAgentEngine
 from src.modules.stt.stt_google import GoogleSTTEngine
 from src.prompter import Prompter
 # Class Imports
@@ -68,16 +73,25 @@ async def main():
     # Create STT
     # stt = STT(signals)
     # Create TTS
-    # tts = TTS(signals)
+    tts = TTS(signals)
     # Create LLMWrappers
     # llmState = LLMState()
-    # llms = {
-    #     "text": TextLLMWrapper(signals, tts, llmState, src),
-    #     "image": ImageLLMWrapper(signals, tts, llmState, src)
-    # }
+    # Create Agent
+    main_agent = VertexAgentEngine(
+        system_instruction=SYSTEM_PROMPT,
+        model_name=env.MODEL_NAME,
+        enabled_session=True)
+    # memory_agent= VertexAgentEngine(
+    #     system_instruction=MEMORY_PROMPT,
+    #     model_name=env.MODEL_NAME,
+    #     enabled_session=False)
+    llms = {
+        "text": TextLLMWrapper(signals, tts, llmState, main_agent, modules),
+        "image": ImageLLMWrapper(signals, tts, llmState, main_agent, modules)
+    }
     # Create Prompter
     fragment_manager = FragmentManager(signals)
-    prompter = Prompter(signals, None,fragment_manager, None)
+    prompter = Prompter(signals, llms,fragment_manager, modules)
 
     # Create Discord bot
     stt = GoogleSTTEngine()
@@ -90,17 +104,17 @@ async def main():
     # discord_bot = DiscordClient(signals, stt,fragment_manager, enabled=False)
     # await discord_bot.run()
     # Create Twitch bot
-    # src['twitch'] = TwitchClient(signals, enabled=False)
+    # modules['twitch'] = TwitchClient(signals, enabled=False)
     # Create audio player
-    # src['audio_player'] = AudioPlayer(signals, enabled=True)
+    # modules['audio_player'] = AudioPlayer(signals, enabled=True)
     # Create Vtube Studio plugin
-    # src['vtube_studio'] = VtubeStudio(signals, enabled=True)
+    # modules['vtube_studio'] = VtubeStudio(signals, enabled=True)
     # Create Multimodal module
-    # src['multimodal'] = MultiModal(signals, enabled=False)
+    modules['multimodal'] = MultiModal(signals, enabled=False)
     # Create Custom Prompt module
-    # src['custom_prompt'] = CustomPrompt(signals, enabled=True)
+    # modules['custom_prompt'] = CustomPrompt(signals, enabled=True)
     # Create Memory module
-    # src['memory'] = Memory(signals, enabled=True)
+    # modules['memory'] = Memory(signals, enabled=True)
 
     # Create Socket.io server
     # The specific llmWrapper it gets doesn't matter since state is shared between all llmWrappers
@@ -116,10 +130,10 @@ async def main():
     # stt_thread.start()
 
     # Crear 1 hilo por cada módulo
-    # for name, module in modules.items():
-    #     module_thread = threading.Thread(target=module.init_event_loop, daemon=True)
-    #     module_threads[name] = module_thread
-    #     module_thread.start()
+    for name, module in modules.items():
+        module_thread = threading.Thread(target=module.init_event_loop, daemon=True)
+        module_threads[name] = module_thread
+        module_thread.start()
 
     while not signals.terminate:
         time.sleep(0.1)

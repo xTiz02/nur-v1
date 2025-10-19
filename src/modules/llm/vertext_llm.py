@@ -1,0 +1,112 @@
+from typing import List
+
+import vertexai
+from google.genai.types import Content
+from vertexai.generative_models import GenerativeModel, GenerationConfig, ChatSession, HarmCategory, HarmBlockThreshold
+import logging
+from utils.constans import *
+import env
+from llm_Interface import LLMInterface
+
+logger = logging.getLogger(__name__)
+
+
+class VertexAgentEngine(LLMInterface):
+    def __init__(
+            self,
+            system_instruction: str = SYSTEM_PROMPT,
+            model_name: str = env.MODEL_NAME,
+            temperature: float = 0.7,
+            max_output_tokens: int = 128,
+            enabled_session = False,
+    ):
+        """
+        Inicializa un agente con sesión persistente en VertexAI.
+
+        Args:
+            system_instruction (str): instrucción del sistema para el modelo
+            model_name (str): nombre del modelo de VertexAI
+            temperature (float): creatividad de la respuesta
+            max_output_tokens (int): longitud máxima de salida
+        """
+        self.project_id = env.PROJECT_ID
+        self.location = env.REGION
+
+        # Inicializa Vertex
+        vertexai.init(project=self.project_id, location=self.location)
+
+        # Configuración de seguridad más permisiva
+        self.safety_settings = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        }
+
+        # Configura modelo y sesión de chat
+        self.model = GenerativeModel(
+            model_name=model_name,
+            system_instruction=system_instruction,
+            generation_config=GenerationConfig(
+                temperature=temperature,
+                max_output_tokens=max_output_tokens,
+            ),
+            safety_settings=self.safety_settings
+        )
+
+        # Sesión persistente (recuerda contexto) con validación deshabilitada
+        self.chatSession = None
+        if enabled_session :
+            self.chatSession: ChatSession = self.model.start_chat(
+            response_validation=False
+        )
+
+
+    def chat(self, prompt: str | List[Content]) -> str:
+        # Por el momento solo para el bot o para memoria
+        if self.chatSession:
+            responses = self.chatSession.send_message(content=prompt, stream=True)
+            for response in responses:
+                print("Block recibido:")
+                print(response.text)
+        else :
+            responses = self.model.generate_content(contents=prompt, stream=True)
+            for response in responses:
+                print("Block recibido:")
+                print(response.text)
+
+
+    def _get_generic_fallback_response(self) -> str:
+        """
+        Respuesta genérica cuando otros métodos fallan
+        """
+        # response = self.fallback_responses[self.fallback_index % len(self.fallback_responses)]
+        # self.fallback_index += 1
+        # print(f"[DEBUG] Usando respuesta de fallback: {response}")
+        # return response
+
+    def reset_session(self):
+        """
+        Reinicia la sesión de chat en caso de problemas persistentes
+        """
+        if not self.chatSession:
+            print("[DEBUG] No hay sesión activa para reiniciar")
+            return
+        try:
+            print("[DEBUG] Reiniciando sesión de chat de VertexAI")
+            self.chatSession = self.model.start_chat(response_validation=False)
+            print("[DEBUG] Sesión reiniciada correctamente")
+        except Exception as e:
+            print(f"[ERROR] Error al reiniciar sesión: {e}")
+
+    def get_session_history_length(self) -> int:
+        if not self.chatSession:
+            print("[DEBUG] No hay sesión activa para obtener historial")
+            return 0
+        """
+        Obtiene la longitud del historial de la sesión actual
+        """
+        try:
+            return len(self.chatSession.history)
+        except:
+            return 0
