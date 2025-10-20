@@ -17,7 +17,7 @@ class VertexAgentEngine(LLMInterface):
             system_instruction: str = SYSTEM_PROMPT,
             model_name: str = env.MODEL_NAME,
             temperature: float = 0.7,
-            max_output_tokens: int = 128,
+            max_output_tokens: int = 512,
             enabled_session = False,
     ):
         """
@@ -62,18 +62,17 @@ class VertexAgentEngine(LLMInterface):
         )
 
 
-    def chat(self, prompt: str | List[Content]) -> str:
+    async def chat(self, prompt: str | List[Content]):
         # Por el momento solo para el bot o para memoria
         if self.chatSession:
             responses = self.chatSession.send_message(content=prompt, stream=True)
-            for response in responses:
-                print("Block recibido:")
-                print(response.text)
+            for part in responses:
+                print(f"Block recibido:")
+                print(part)
+                yield part
         else :
-            responses = self.model.generate_content(contents=prompt, stream=True)
-            for response in responses:
-                print("Block recibido:")
-                print(response.text)
+            response = self.model.generate_content(contents=prompt, stream=False)
+            yield response
 
 
     def _get_generic_fallback_response(self) -> str:

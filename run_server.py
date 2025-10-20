@@ -4,6 +4,8 @@ import sys
 import time
 import threading
 import asyncio
+
+from src.com.wrapper.llm_state import LLMState
 from utils.constans import *
 import env
 from src.com.wrapper.image_llm_wrapper import ImageLLMWrapper
@@ -75,7 +77,7 @@ async def main():
     # Create TTS
     tts = TTS(signals)
     # Create LLMWrappers
-    # llmState = LLMState()
+    llm_state = LLMState()
     # Create Agent
     main_agent = VertexAgentEngine(
         system_instruction=SYSTEM_PROMPT,
@@ -86,8 +88,8 @@ async def main():
     #     model_name=env.MODEL_NAME,
     #     enabled_session=False)
     llms = {
-        "text": TextLLMWrapper(signals, tts, llmState, main_agent, modules),
-        "image": ImageLLMWrapper(signals, tts, llmState, main_agent, modules)
+        "text": TextLLMWrapper(signals, tts, llm_state, main_agent, modules),
+        "image": ImageLLMWrapper(signals, tts, llm_state, main_agent, modules)
     }
     # Create Prompter
     fragment_manager = FragmentManager(signals)
@@ -96,7 +98,6 @@ async def main():
     # Create Discord bot
     stt = GoogleSTTEngine()
     # modules['discord'] = DiscordClient(signals, stt,fragment_manager, enabled=False)
-    # Hilo del bot
     bot_thread = threading.Thread(
         target=run_discord_bot, args=(signals, stt, fragment_manager), daemon=True
     )
