@@ -75,7 +75,7 @@ async def main():
     # Create STT
     # stt = STT(signals)
     # Create TTS
-    tts = TTS(signals)
+    # tts = TTS(signals)
     # Create LLMWrappers
     llm_state = LLMState()
     # Create Agent
@@ -88,8 +88,8 @@ async def main():
     #     model_name=env.MODEL_NAME,
     #     enabled_session=False)
     llms = {
-        "text": TextLLMWrapper(signals, tts, llm_state, main_agent, modules),
-        "image": ImageLLMWrapper(signals, tts, llm_state, main_agent, modules)
+        "text": TextLLMWrapper(signals, None, llm_state, main_agent, modules),
+        "image": ImageLLMWrapper(signals, None, llm_state, main_agent, modules)
     }
     # Create Prompter
     fragment_manager = FragmentManager(signals)

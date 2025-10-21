@@ -7,6 +7,7 @@ from typing import List
 from env import MODEL_NAME
 from src.com.model.models import Fragment
 from src.com.wrapper.llm_state import LLMState
+from src.modules.llm.llm_interface import LLMInterface
 from utils.constans import *
 import vertexai
 from vertexai.generative_models import GenerativeModel, HarmCategory, HarmBlockThreshold, GenerationConfig
@@ -16,7 +17,7 @@ from src.injection import Injection
 
 class AbstractLLMWrapper:
 
-    def __init__(self, signals, tts, llm_state: LLMState,agent, modules=None):
+    def __init__(self, signals, tts, llm_state: LLMState,agent:LLMInterface, modules=None):
         self.signals = signals
         self.llm_state = llm_state
         self.agent = agent
@@ -106,29 +107,30 @@ class AbstractLLMWrapper:
         self.signals.new_message = False
         self.signals.sio_queue.put(("reset_next_message", None))
 
+        self.agent.chat(data)
 
         AI_message = ''
         # Aqui hacer cambios para llamar a al metodo de chat de agente y obtener el stream  de datos de respuesta.
-        for event in response_stream.events():
-            # Check to see if next message was canceled
-            if self.llm_state.next_cancelled:
-                print(f"Chunk de texto cancelado.")
-                continue
-
-            payload = json.loads(event.data)
-            chunk = payload['choices'][0]['delta']['content']
-            AI_message += chunk
-            self.signals.sio_queue.put(("next_chunk", chunk))
-
-        if self.llm_state.next_cancelled:
-            self.llm_state.next_cancelled = False
-            self.signals.sio_queue.put(("reset_next_message", None))
-            self.signals.AI_thinking = False
-            return
+        # for event in response_stream.events():
+        #     # Check to see if next message was canceled
+        #     if self.llm_state.next_cancelled:
+        #         print(f"Chunk de texto cancelado.")
+        #         continue
+        #
+        #     payload = json.loads(event.data)
+        #     chunk = payload['choices'][0]['delta']['content']
+        #     AI_message += chunk
+        #     self.signals.sio_queue.put(("next_chunk", chunk))
+        #
+        # if self.llm_state.next_cancelled:
+        #     self.llm_state.next_cancelled = False
+        #     self.signals.sio_queue.put(("reset_next_message", None))
+        #     self.signals.AI_thinking = False
+        #     return
 
         print("AI OUTPUT: " + AI_message)
         self.signals.last_message_time = time.time()
-        self.signals.AI_speaking = True
+        self.signals.AI_speaking = False
         self.signals.AI_thinking = False
 
         if self.is_filtered(AI_message):
@@ -136,8 +138,8 @@ class AbstractLLMWrapper:
             self.signals.sio_queue.put(("reset_next_message", None))
             self.signals.sio_queue.put(("next_chunk", AI_message))
 
-        self.signals.history.append({"role": "assistant", "content": AI_message})
-        self.tts.play(AI_message)
+        # self.signals.history.append({"role": "assistant", "content": AI_message})
+        # self.tts.play(AI_message)
 
     class API:
         def __init__(self, outer):

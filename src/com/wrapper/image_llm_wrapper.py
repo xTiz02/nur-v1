@@ -8,7 +8,7 @@ from vertexai.generative_models import Part, Image
 from utils.constans import *
 
 from src.com.wrapper.llm_abstract_wrapper import AbstractLLMWrapper
-from src.modules.llm.llm_Interface import LLMInterface
+from src.modules.llm.llm_interface import LLMInterface
 
 
 class ImageLLMWrapper(AbstractLLMWrapper):

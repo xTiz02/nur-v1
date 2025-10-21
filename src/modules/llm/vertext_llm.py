@@ -4,9 +4,11 @@ import vertexai
 from google.genai.types import Content
 from vertexai.generative_models import GenerativeModel, GenerationConfig, ChatSession, HarmCategory, HarmBlockThreshold
 import logging
+
+from src.modules.llm.llm_interface import LLMInterface
 from utils.constans import *
 import env
-from llm_Interface import LLMInterface
+
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +19,7 @@ class VertexAgentEngine(LLMInterface):
             system_instruction: str = SYSTEM_PROMPT,
             model_name: str = env.MODEL_NAME,
             temperature: float = 0.7,
-            max_output_tokens: int = 512,
+            max_output_tokens: int = 5000,
             enabled_session = False,
     ):
         """
@@ -55,21 +57,20 @@ class VertexAgentEngine(LLMInterface):
         )
 
         # Sesión persistente (recuerda contexto) con validación deshabilitada
-        self.chatSession = None
-        if enabled_session :
+        if enabled_session:
             self.chatSession: ChatSession = self.model.start_chat(
-            response_validation=False
-        )
+                response_validation=False
+            )
 
 
-    async def chat(self, prompt: str | List[Content]):
+    def chat(self, prompt: str | List[Content]):
         # Por el momento solo para el bot o para memoria
         if self.chatSession:
             responses = self.chatSession.send_message(content=prompt, stream=True)
             for part in responses:
                 print(f"Block recibido:")
-                print(part)
-                yield part
+                print(part.text)
+                # yield part.text
         else :
             response = self.model.generate_content(contents=prompt, stream=False)
             yield response
