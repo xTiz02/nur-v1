@@ -63,18 +63,40 @@ class VertexAgentEngine(LLMInterface):
             )
 
 
-    def chat(self, prompt: str | List[Content]):
-        # Por el momento solo para el bot o para memoria
-        if self.chatSession:
-            responses = self.chatSession.send_message(content=prompt, stream=True)
-            for part in responses:
-                print(f"Block recibido:")
-                print(part.text)
-                # yield part.text
-        else :
-            response = self.model.generate_content(contents=prompt, stream=False)
-            yield response
+    def chat(self, prompt: str | List[Content]) -> str:
+        """
+        Retorna respuesta COMPLETA como string (sin streaming).
 
+        Args:
+            prompt: Texto del prompt
+
+        Returns:
+            Respuesta completa como string
+        """
+        try:
+            if self.chatSession:
+                logger.info("Generando respuesta con sesión...")
+                response = self.chatSession.send_message(
+                    content=prompt,
+                    stream=False
+                )
+                logger.info("Respuesta completa recibida")
+                return response.text
+            else:
+                logger.info("Generando respuesta sin sesión...")
+                response = self.model.generate_content(
+                    contents=prompt,
+                    stream=False
+                )
+                logger.info("Respuesta completa recibida")
+                return response.text
+        except Exception as e:
+            logger.error(f"Error en chat(): {e}", exc_info=True)
+            return f"Error al generar respuesta: {str(e)}"
+
+    def memory(self, prompt: str | List[Content]):
+        response = self.model.generate_content(contents=prompt, stream=False)
+        return response.text
 
     def _get_generic_fallback_response(self) -> str:
         """

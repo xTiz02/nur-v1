@@ -1,54 +1,101 @@
-import simpleaudio as sa  # Para reproducción de audio en tiempo real
+import itertools
+import logging
+import subprocess
+
 from google.cloud import texttospeech
-import pyaudio
-import itertools  # Para manejar iterables
 
-def run_streaming_tts_quickstart():
-    """Synthesizes and plays speech from a stream of input text."""
-    client = texttospeech.TextToSpeechClient()
+logger = logging.getLogger(__name__)
 
-    streaming_config = texttospeech.StreamingSynthesizeConfig(
-        voice=texttospeech.VoiceSelectionParams(
-            name="es-US-Journey-F", language_code="es-US"
-        ),
-    )
+class GoogleTTSEngine:
+    """
+    Streaming TTS con Google Cloud Text-to-Speech (bidireccional).
+    """
+    def __init__(
+        self,
+        language: str = "es-US",
+        voice_name: str = "es-US-Journey-F",
+        sample_rate_hz: int = 48000,
+        speaking_rate: float = 1.2,
+    ):
+        self.client = texttospeech.TextToSpeechClient()
+        self.default_language = language
+        self.default_voice_name = voice_name
+        self.sample_rate_hz = sample_rate_hz
+        self.speaking_rate = speaking_rate
+        self.audio_config = texttospeech.StreamingAudioConfig(
+            audio_encoding=texttospeech.AudioEncoding.OGG_OPUS,
+        )
 
-    # Configuración inicial de la solicitud
-    config_request = texttospeech.StreamingSynthesizeRequest(
-        streaming_config=streaming_config,
+        self.streaming_config = texttospeech.StreamingSynthesizeConfig(
+            voice=texttospeech.VoiceSelectionParams(
+                name=voice_name,
+                language_code=language,
+            ),
+            streaming_audio_config=self.audio_config
+        )
+    def synthesize_streaming(self, text: str):
+        """
+        Sintetiza texto completo y retorna chunks de audio.
 
-    )
+        Args:
+            text: Texto completo a sintetizar
 
-    # Generador de solicitudes
-    def request_generator():
-        # yield texttospeech.StreamingSynthesizeRequest(input=texttospeech.StreamingSynthesisInput(text="Hola, soy una prueba de texto a voz en tiempo real. "))
-        yield texttospeech.StreamingSynthesizeRequest(input=texttospeech.StreamingSynthesisInput(text="Como parte de esta prueba, estoy generando audio en tiempo real. "))
-        yield texttospeech.StreamingSynthesizeRequest(input=texttospeech.StreamingSynthesisInput(text="¿Todo bien? "))
-        yield texttospeech.StreamingSynthesizeRequest(input=texttospeech.StreamingSynthesisInput(text="Espero que sí."))
+        Yields:
+            Bytes de audio PCM (chunks)
+        """
+        if not text or not text.strip():
+            logger.warning("Texto vacío recibido")
+            return
 
-    # Llamada a la API de streaming
-    streaming_responses = client.streaming_synthesize(
-        itertools.chain([config_request], request_generator())
-    )
+        try:
+            logger.info(f"Sintetizando texto: {len(text)} caracteres")
 
-    p = pyaudio.PyAudio()
+            # Requests
+            config_request = texttospeech.StreamingSynthesizeRequest(
+                streaming_config=self.streaming_config
+            )
 
-    # Open a stream
-    stream = p.open(format=pyaudio.paInt16,  # Assuming 16-bit audio. Adjust if needed.
-                    channels=1,  # Assuming mono audio. Adjust if needed.
-                    rate=24000,
-                    # Assuming 22050 Hz sample rate.  Adjust if needed.  Get this from your response if possible!
-                    output=True)
-    # Procesar respuestas y reproducir audio en tiempo real por partes
-    for idx, response in enumerate(streaming_responses):
-        audio_content = response.audio_content  # Datos de audio
-        print(f"Fragmento {idx + 1} - Audio content size in bytes is: {len(audio_content)}")
-        if audio_content:
-            # Play the audio chunk
-            try:
-                stream.write(audio_content)
-            except Exception as e:
-                print(f"Error playing audio chunk {idx + 1}: {e}")
+            text_request = texttospeech.StreamingSynthesizeRequest(
+                input=texttospeech.StreamingSynthesisInput(text=text)
+            )
 
-if __name__ == "__main__":
-    run_streaming_tts_quickstart()
+            # Llamar a Google TTS (blocking, pero retorna generator)
+            logger.debug("Llamando a Google TTS API...")
+            responses = self.client.streaming_synthesize(
+                itertools.chain([config_request, text_request])
+            )
+
+            # Producir chunks de audio
+            chunk_count = 0
+            for response in responses:
+                if response.audio_content:
+                    chunk_count += 1
+                    logger.debug(f"Chunk #{chunk_count}: {len(response.audio_content)} bytes")
+                    yield response.audio_content
+
+            logger.info(f"Síntesis completa: {chunk_count} chunks generados")
+
+        except Exception as e:
+            logger.error(f"Error en síntesis: {e}", exc_info=True)
+
+    def process_audio_chunk(self, audio_chunk: bytes) -> bytes:
+        """
+        Procesa un chunk de audio recibido del stream.
+        Aquí puedes agregar procesamiento adicional si es necesario.
+        """
+        return self._ogg_to_pcm48(audio_chunk)
+
+    import subprocess
+
+    def _ogg_to_pcm48(self, audio_bytes: bytes) -> bytes:
+        """
+        Convierte audio OGG_OPUS → PCM 16-bit mono 48kHz (raw)
+        usando ffmpeg en memoria.
+        """
+        process = subprocess.Popen(
+            ["ffmpeg", "-i", "pipe:0", "-f", "s16le", "-acodec", "pcm_s16le",
+             "-ac", "1", "-ar", "48000", "pipe:1"],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
+        )
+        pcm_data, _ = process.communicate(audio_bytes)
+        return pcm_data

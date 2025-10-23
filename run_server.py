@@ -6,6 +6,7 @@ import threading
 import asyncio
 
 from src.com.wrapper.llm_state import LLMState
+from src.modules.tts.tts_google import GoogleTTSEngine
 from utils.constans import *
 import env
 from src.com.wrapper.image_llm_wrapper import ImageLLMWrapper
@@ -83,13 +84,14 @@ async def main():
         system_instruction=SYSTEM_PROMPT,
         model_name=env.MODEL_NAME,
         enabled_session=True)
-    # memory_agent= VertexAgentEngine(
-    #     system_instruction=MEMORY_PROMPT,
-    #     model_name=env.MODEL_NAME,
-    #     enabled_session=False)
+    memory_agent= VertexAgentEngine(
+        system_instruction=MEMORY_PROMPT,
+        model_name=env.MODEL_NAME,
+        enabled_session=False)
+    tts = GoogleTTSEngine()
     llms = {
-        "text": TextLLMWrapper(signals, None, llm_state, main_agent, modules),
-        "image": ImageLLMWrapper(signals, None, llm_state, main_agent, modules)
+        "text": TextLLMWrapper(signals, tts, llm_state, main_agent, modules),
+        "image": ImageLLMWrapper(signals, tts, llm_state, main_agent, modules)
     }
     # Create Prompter
     fragment_manager = FragmentManager(signals)
@@ -97,7 +99,7 @@ async def main():
 
     # Create Discord bot
     stt = GoogleSTTEngine()
-    # modules['discord'] = DiscordClient(signals, stt,fragment_manager, enabled=False)
+    tts = None
     bot_thread = threading.Thread(
         target=run_discord_bot, args=(signals, stt, fragment_manager), daemon=True
     )
@@ -106,8 +108,6 @@ async def main():
     # await discord_bot.run()
     # Create Twitch bot
     # modules['twitch'] = TwitchClient(signals, enabled=False)
-    # Create audio player
-    # modules['audio_player'] = AudioPlayer(signals, enabled=True)
     # Create Vtube Studio plugin
     # modules['vtube_studio'] = VtubeStudio(signals, enabled=True)
     # Create Multimodal module
@@ -115,7 +115,7 @@ async def main():
     # Create Custom Prompt module
     # modules['custom_prompt'] = CustomPrompt(signals, enabled=True)
     # Create Memory module
-    # modules['memory'] = Memory(signals, enabled=True)
+    # modules['memory'] = Memory(signals,memory_agent, enabled=True)
 
     # Create Socket.io server
     # The specific llmWrapper it gets doesn't matter since state is shared between all llmWrappers

@@ -1,3 +1,4 @@
+import queue
 from typing import Any, Tuple, List
 from queue import Queue
 
@@ -21,6 +22,7 @@ class Signals:
         SignalQueue = Queue[Tuple[EventType, Any]]
         self.sio_queue: SignalQueue = Queue()
         self._process_text = False
+        self.audio_queue = queue.Queue()
 
     @property
     def human_speaking(self):

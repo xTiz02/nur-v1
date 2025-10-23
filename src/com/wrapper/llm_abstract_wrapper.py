@@ -1,5 +1,6 @@
 import copy
 import json
+import logging
 import time
 from abc import abstractmethod
 from typing import List
@@ -8,16 +9,18 @@ from env import MODEL_NAME
 from src.com.model.models import Fragment
 from src.com.wrapper.llm_state import LLMState
 from src.modules.llm.llm_interface import LLMInterface
+from src.modules.tts.tts_google import GoogleTTSEngine
 from utils.constans import *
 import vertexai
 from vertexai.generative_models import GenerativeModel, HarmCategory, HarmBlockThreshold, GenerationConfig
 import env
 from src.injection import Injection
 
+logger = logging.getLogger(__name__)
 
 class AbstractLLMWrapper:
 
-    def __init__(self, signals, tts, llm_state: LLMState,agent:LLMInterface, modules=None):
+    def __init__(self, signals, tts:GoogleTTSEngine, llm_state: LLMState,agent:LLMInterface, modules=None):
         self.signals = signals
         self.llm_state = llm_state
         self.agent = agent
@@ -92,54 +95,93 @@ class AbstractLLMWrapper:
         raise NotImplementedError("Must implement prepare_payload in child classes")
 
     def prompt(self):
+        """
+        Método principal - TODO EN ESTE HILO (Prompter).
+        1. Obtiene respuesta COMPLETA del LLM (blocking)
+        2. Envía a TTS que genera chunks de audio (blocking generator)
+        3. Cada chunk va a la cola para el bot
+        """
         if not self.llm_state.enabled:
             return
 
         self.signals.AI_thinking = True
-        data = None
+
+        # Preparar datos
         if self.signals.new_message:
-            data = self.prepare_payload()
+            prompt_data = self.prepare_payload()
         else:
-            # Si se llego aqui algo salio mal, no deberia llegar aqui sin input nuevo
-            print("No new message to process.")
-            # data = self.default_prompt()
+            logger.warning("No new message to process")
             return
+
         self.signals.new_message = False
         self.signals.sio_queue.put(("reset_next_message", None))
 
-        self.agent.chat(data)
+        try:
+            # PASO 1: Obtener respuesta COMPLETA del LLM (blocking)
+            logger.info("Solicitando respuesta al LLM...")
+            full_text = self.agent.chat(prompt_data)  # ← Retorna STRING directamente
 
-        AI_message = ''
-        # Aqui hacer cambios para llamar a al metodo de chat de agente y obtener el stream  de datos de respuesta.
-        # for event in response_stream.events():
-        #     # Check to see if next message was canceled
-        #     if self.llm_state.next_cancelled:
-        #         print(f"Chunk de texto cancelado.")
-        #         continue
-        #
-        #     payload = json.loads(event.data)
-        #     chunk = payload['choices'][0]['delta']['content']
-        #     AI_message += chunk
-        #     self.signals.sio_queue.put(("next_chunk", chunk))
-        #
-        # if self.llm_state.next_cancelled:
-        #     self.llm_state.next_cancelled = False
-        #     self.signals.sio_queue.put(("reset_next_message", None))
-        #     self.signals.AI_thinking = False
-        #     return
+            # Verificar cancelación
+            if self.llm_state.next_cancelled:
+                logger.info("Generación cancelada")
+                self.llm_state.next_cancelled = False
+                self.signals.AI_thinking = False
+                return
 
-        print("AI OUTPUT: " + AI_message)
-        self.signals.last_message_time = time.time()
-        self.signals.AI_speaking = False
-        self.signals.AI_thinking = False
+            logger.info(f"Respuesta recibida: {len(full_text)} caracteres")
+            logger.debug(f"Texto: '{full_text[:100]}...'")
 
-        if self.is_filtered(AI_message):
-            AI_message = "Sin comentarios ..."
-            self.signals.sio_queue.put(("reset_next_message", None))
-            self.signals.sio_queue.put(("next_chunk", AI_message))
+            # Filtrado
+            if self.is_filtered(full_text):
+                full_text = "Sin comentarios..."
+                logger.warning("Respuesta filtrada por lista negra")
 
-        # self.signals.history.append({"role": "assistant", "content": AI_message})
-        # self.tts.play(AI_message)
+            # Guardar en historial
+            self.signals.history.append({"role": "assistant", "content": full_text})
+
+            # Enviar a UI
+            self.signals.sio_queue.put(("next_chunk", full_text))
+
+            # PASO 2: Enviar texto completo al TTS (blocking generator)
+            logger.info("Enviando texto al TTS...")
+            self.signals.AI_thinking = False  # Ya no está pensando
+
+            # TTS retorna un generator de chunks de audio
+            audio_generator = self.tts.synthesize_streaming(full_text)
+
+            # PASO 3: Procesar chunks de audio y ponerlos en cola
+            chunk_count = 0
+            first_chunk = True
+
+            for audio_chunk in audio_generator:  # ← Generator SÍNCRONO
+                # Verificar cancelación
+                if self.llm_state.next_cancelled:
+                    logger.info("TTS cancelado")
+                    break
+
+                if audio_chunk:
+                    chunk_count += 1
+
+                    # Poner en cola para el bot
+                    process = self.tts.process_audio_chunk(audio_chunk)
+                    self.signals.audio_queue.put(process)
+
+                    # Señalizar primer chunk
+                    if first_chunk:
+                        self.signals.audio_ready = True
+                        logger.info("Primer chunk de audio disponible para el bot")
+                        first_chunk = False
+
+                    logger.debug(f"Chunk #{chunk_count} encolado: {len(audio_chunk)} bytes")
+
+            logger.info(f"TTS completado: {chunk_count} chunks de audio enviados")
+
+        except Exception as e:
+            logger.error(f"Error durante prompt(): {e}", exc_info=True)
+
+        finally:
+            self.signals.AI_thinking = False
+            self.signals.last_message_time = time.time()
 
     class API:
         def __init__(self, outer):

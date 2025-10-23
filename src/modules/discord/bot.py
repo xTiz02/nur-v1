@@ -1,3 +1,5 @@
+import asyncio
+import io
 import os
 import time
 
@@ -28,6 +30,8 @@ class DiscordClient(Module):
         super().__init__(signals, enabled)
         self.stt = stt
         self.manager = manager
+        self.vc = None  # conexión de voz
+        self.play_task = None  # tarea async para reproducir
 
     def _process_audio(self, recognizer: sr.Recognizer, audio: sr.AudioData, user):
         self.signals.process_text = True
@@ -41,6 +45,30 @@ class DiscordClient(Module):
             print(f"[ERROR] Fallo en _process_audio: {e}")
         self.signals.process_text = False
         return None
+
+    async def _play_from_queue(self):
+        """Lee chunks de audio desde la queue y los envía al canal de voz."""
+        print("[DEBUG] _play_from_queue() iniciado")
+        while not self.signals.terminate:
+            try:
+                # Espera un chunk desde el hilo TTS
+                chunk = await asyncio.get_event_loop().run_in_executor(None, self.signals.audio_queue.get)
+
+                if chunk is None or not self.vc or not self.vc.is_connected():
+                    await asyncio.sleep(0.05)
+                    continue
+                print("[DEBUG] Reproduciendo chunk de audio desde la queue")
+                # reproducir chunk (PCM raw)
+                # audio = discord.PCMAudio(io.BytesIO(chunk))  # usa FFmpeg si es necesario
+                self.vc.play(chunk)
+
+                # esperar hasta que acabe antes del siguiente
+                while self.vc.is_playing():
+                    await asyncio.sleep(0.02)
+
+            except Exception as e:
+                print(f"[ERROR] en _play_from_queue: {e}")
+                await asyncio.sleep(0.1)
 
     async def run(self):
         intents = discord.Intents.default()
@@ -72,7 +100,10 @@ class DiscordClient(Module):
                 )
                 self.vc = vc
                 print("[DEBUG] Conectado al canal de voz")
-
+                # Iniciar la tarea async para reproducir audio desde la queue
+                if not self.play_task or self.play_task.done():
+                    loop = asyncio.get_event_loop()
+                    self.play_task = loop.create_task(self._play_from_queue())
                 sink = LoggingSpeechRecognitionSink(
                     process_cb=lambda recognizer, audio, user: self._process_audio(recognizer, audio, user),
                     text_cb=lambda u, t: None,  # desactivamos text_cb directo
