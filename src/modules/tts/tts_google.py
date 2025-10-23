@@ -1,8 +1,10 @@
+import io
 import itertools
 import logging
 import subprocess
 
 from google.cloud import texttospeech
+from pydub import AudioSegment
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +98,41 @@ class GoogleTTSEngine:
             ["ffmpeg", "-i", "pipe:0", "-f", "s16le", "-acodec", "pcm_s16le",
              "-ac", "1", "-ar", "48000", "pipe:1"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
+        )
+        pcm_data, _ = process.communicate(audio_bytes)
+        return pcm_data
+
+    def convert_audio_with_pydub(self, audio_bytes: bytes,
+        input_format="ogg") -> bytes:
+        """
+        Convierte audio (OGG, MP3, etc.) a PCM 16-bit estéreo 48kHz (raw).
+        """
+        # Cargar desde bytes en formato OGG
+        audio = AudioSegment.from_file(io.BytesIO(audio_bytes),
+                                       format=input_format)
+
+        # Convertir a estéreo 48kHz
+        audio = audio.set_channels(2)
+        audio = audio.set_frame_rate(48000)
+
+        # Exportar como PCM 16-bit (raw)
+        raw_bytes = audio.raw_data
+        return raw_bytes
+
+    def decode_ogg_to_pcm48(self, audio_bytes: bytes) -> bytes:
+        """
+        Convierte audio OGG_OPUS → PCM 16-bit mono 48kHz en memoria (usando ffmpeg).
+        """
+        process = subprocess.Popen(
+            [
+                "ffmpeg", "-f", "ogg", "-i", "pipe:0",  # entrada ogg desde stdin
+                "-f", "s16le", "-acodec", "pcm_s16le",  # salida PCM 16-bit
+                "-ac", "2", "-ar", "48000",             # estéreo, 48kHz
+                "pipe:1"
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
         )
         pcm_data, _ = process.communicate(audio_bytes)
         return pcm_data
