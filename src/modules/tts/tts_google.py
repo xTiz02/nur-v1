@@ -1,14 +1,8 @@
-import io
 import itertools
-import logging
-import subprocess
 from pathlib import Path
 
 import numpy as np
 from google.cloud import texttospeech
-from pydub import AudioSegment
-
-logger = logging.getLogger(__name__)
 
 class GoogleTTSEngine:
     """
@@ -49,11 +43,11 @@ class GoogleTTSEngine:
             Bytes de audio PCM (chunks)
         """
         if not text or not text.strip():
-            logger.warning("Texto vacío recibido")
+            print("Texto vacío recibido")
             return
 
         try:
-            logger.info(f"Sintetizando texto: {len(text)} caracteres")
+            print(f"Sintetizando texto: {len(text)} caracteres")
 
             # Requests
             config_request = texttospeech.StreamingSynthesizeRequest(
@@ -65,7 +59,7 @@ class GoogleTTSEngine:
             )
 
             # Llamar a Google TTS (blocking, pero retorna generator)
-            logger.debug("Llamando a Google TTS API...")
+            print("Llamando a Google TTS API...")
             responses = self.client.streaming_synthesize(
                 itertools.chain([config_request, text_request])
             )
@@ -75,15 +69,14 @@ class GoogleTTSEngine:
             for response in responses:
                 if response.audio_content:
                     chunk_count += 1
-                    logger.debug(f"Chunk #{chunk_count}: {len(response.audio_content)} bytes")
+                    print(f"Chunk #{chunk_count}: {len(response.audio_content)} bytes")
                     yield response.audio_content
 
-            logger.info(f"Síntesis completa: {chunk_count} chunks generados")
+            print(f"Síntesis completa: {chunk_count} chunks generados")
 
         except Exception as e:
-            logger.error(f"Error en síntesis: {e}", exc_info=True)
+            print(f"Error en síntesis: {e}", exc_info=True)
 
-# -------------------- MODO COMPLETO --------------------
     def synthesize_full(self, text: str, *, language: str = None, voice: str = None, save_path: str = None) -> bytes:
         """
         Sintetiza texto completo y retorna todo el audio en un solo bloque PCM 16-bit.
@@ -106,23 +99,23 @@ class GoogleTTSEngine:
                 speaking_rate=self.speaking_rate,
             )
 
-            logger.info(f"[TTS] Sintetizando (modo completo): {len(text)} caracteres")
+            print(f"[TTS] Sintetizando (modo completo): {len(text)} caracteres")
             response = self.client.synthesize_speech(
                 input=synthesis_input, voice=voice_params, audio_config=audio_config
             )
 
             audio_bytes = response.audio_content
-            logger.debug(f"[TTS] Recibido audio: {len(audio_bytes)} bytes")
+            print(f"[TTS] Recibido audio: {len(audio_bytes)} bytes")
 
             # Guardar archivo si se indicó una ruta
             if save_path:
                 Path(save_path).parent.mkdir(parents=True, exist_ok=True)
                 with open(save_path, "wb") as f:
                     f.write(audio_bytes)
-                logger.info(f"[TTS] Audio guardado en: {save_path}")
+                print(f"[TTS] Audio guardado en: {save_path}")
 
             return audio_bytes
 
         except Exception as e:
-            logger.error(f"[TTS] Error en síntesis completa: {e}", exc_info=True)
+            print(f"[TTS] Error en síntesis completa: {e}", exc_info=True)
             return b""

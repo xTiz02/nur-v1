@@ -99,7 +99,6 @@ async def main():
 
     # Create Discord bot
     stt = GoogleSTTEngine()
-    tts = None
     bot_thread = threading.Thread(
         target=run_discord_bot, args=(signals, stt, fragment_manager), daemon=True
     )

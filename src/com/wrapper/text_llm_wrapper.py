@@ -1,7 +1,6 @@
 import os
 
 from src.modules.llm.llm_interface import LLMInterface
-from utils.constans import *
 
 from src.com.wrapper.llm_abstract_wrapper import AbstractLLMWrapper
 

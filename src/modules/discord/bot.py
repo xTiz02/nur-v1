@@ -1,13 +1,9 @@
 import asyncio
 import io
-import os
-import time
 import numpy as np
 import discord
 from discord.ext import commands, voice_recv
 
-from src.audio_parser import StreamingAudio
-from src.com.model.enums import EventType
 from src.module import Module
 import env
 import speech_recognition as sr
@@ -51,31 +47,24 @@ class DiscordClient(Module):
     async def _play_from_queue(self):
         """Lee audio completo (PCM 16-bit mono 48kHz) desde la cola y lo reproduce."""
         print("[DEBUG] _play_from_queue() iniciado")
-
         while not self.signals.terminate:
             try:
                 # Esperar audio desde la cola (bloque único)
                 audio_bytes = await asyncio.get_event_loop().run_in_executor(None, self.signals.audio_queue.get)
-
                 if not audio_bytes or not self.vc or not self.vc.is_connected():
                     await asyncio.sleep(0.05)
                     continue
-
                 # Convertir mono → estéreo
                 audio = np.frombuffer(audio_bytes, dtype=np.int16)
                 stereo = np.repeat(audio[:, None], 2, axis=1).ravel().astype(np.int16)
                 stereo_bytes = stereo.tobytes()
-
                 # Crear un objeto PCMAudio para Discord
                 source = discord.PCMAudio(io.BytesIO(stereo_bytes))
-
                 print("[DEBUG] Reproduciendo audio completo (PCM LINEAR16 -> estéreo 48kHz)")
                 self.vc.play(source)
-
                 # Esperar a que termine
                 while self.vc.is_playing():
                     await asyncio.sleep(0.05)
-
             except Exception as e:
                 print(f"[ERROR] en _play_from_queue: {e}")
                 await asyncio.sleep(0.1)
@@ -90,6 +79,11 @@ class DiscordClient(Module):
 
         @bot.event
         async def on_ready():
+            # Iniciar la tarea async para reproducir audio desde la queue
+            if not self.play_task or self.play_task.done():
+                loop = asyncio.get_event_loop()
+                self.play_task = loop.create_task(self._play_from_queue())
+            print(f"[DEBUG] Iniciar tarea de reproducción de audio desde la cola.")
             print(f"{bot.user} is online.")
 
         @bot.command(name="ping", description="Check the bot's status")
@@ -104,11 +98,11 @@ class DiscordClient(Module):
             """Send a message to the AI."""
             print(f"[DEBUG] chat() llamado con args: {' '.join(args)}")
             if len(' '.join(args)) > 6:
-                text = ' '.join(args)
                 self.signals.process_text = True
+                text = ' '.join(args)
                 user = {
                     "id": ctx.author.id,
-                    "name": ctx.author.name
+                    "display_name": ctx.author.name
                 }
                 print(f"[DEBUG] Procesando fragmento desde chat(): {text}")
                 self.manager.process_fragment(user, text)
@@ -124,10 +118,6 @@ class DiscordClient(Module):
                 )
                 self.vc = vc
                 print("[DEBUG] Conectado al canal de voz")
-                # Iniciar la tarea async para reproducir audio desde la queue
-                if not self.play_task or self.play_task.done():
-                    loop = asyncio.get_event_loop()
-                    self.play_task = loop.create_task(self._play_from_queue())
                 sink = LoggingSpeechRecognitionSink(
                     process_cb=lambda recognizer, audio, user: self._process_audio(recognizer, audio, user),
                     text_cb=lambda u, t: None,  # desactivamos text_cb directo

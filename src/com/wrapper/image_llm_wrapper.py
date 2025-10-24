@@ -32,11 +32,11 @@ class ImageLLMWrapper(AbstractLLMWrapper):
         # base64
         frame_base64 = base64.b64encode(frame_encoded).decode("utf-8")
         # guardar imagen en una capeta temporal
-        path = "temp"
-        if not os.path.exists(path):
-            os.makedirs(path)
+        path_uri = "demos/temp"
+        if not os.path.exists(path_uri):
+            os.makedirs(path_uri)
         name = str(int(time.time())) + ".jpg"
-        with open(os.path.join("temp", name), "wb") as f:
+        with open(os.path.join(path_uri, name), "wb") as f:
             f.write(base64.b64decode(frame_base64))
 
         print(f"[INFO] Captura de pantalla guardada en {os.path.join('temp', name)}")

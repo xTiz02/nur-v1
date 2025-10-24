@@ -3,15 +3,10 @@ from typing import List
 import vertexai
 from google.genai.types import Content
 from vertexai.generative_models import GenerativeModel, GenerationConfig, ChatSession, HarmCategory, HarmBlockThreshold
-import logging
 
 from src.modules.llm.llm_interface import LLMInterface
 from utils.constans import *
 import env
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-
 
 class VertexAgentEngine(LLMInterface):
     def __init__(
@@ -75,23 +70,23 @@ class VertexAgentEngine(LLMInterface):
         """
         try:
             if self.chatSession:
-                logger.info("Generando respuesta con sesión...")
+                print("Generando respuesta con sesión...")
                 response = self.chatSession.send_message(
                     content=prompt,
                     stream=False
                 )
-                logger.info("Respuesta completa recibida")
+                print("Respuesta completa recibida")
                 return response.text
             else:
-                logger.info("Generando respuesta sin sesión...")
+                print("Generando respuesta sin sesión...")
                 response = self.model.generate_content(
                     contents=prompt,
                     stream=False
                 )
-                logger.info("Respuesta completa recibida")
+                print("Respuesta completa recibida")
                 return response.text
         except Exception as e:
-            logger.error(f"Error en chat(): {e}", exc_info=True)
+            print(f"Error en chat(): {e}")
             return f"Error al generar respuesta: {str(e)}"
 
     def memory(self, prompt: str | List[Content]):

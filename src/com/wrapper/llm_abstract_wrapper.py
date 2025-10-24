@@ -1,10 +1,7 @@
 import copy
-import json
-import logging
 import time
 from abc import abstractmethod
 from typing import List
-
 from env import MODEL_NAME
 from src.com.model.models import Fragment
 from src.com.wrapper.llm_state import LLMState
@@ -15,9 +12,6 @@ import vertexai
 from vertexai.generative_models import GenerativeModel, HarmCategory, HarmBlockThreshold, GenerationConfig
 import env
 from src.injection import Injection
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 class AbstractLLMWrapper:
 
@@ -111,7 +105,7 @@ class AbstractLLMWrapper:
         if self.signals.new_message:
             prompt_data = self.prepare_payload()
         else:
-            logger.warning("No new message to process")
+            print("No new message to process")
             return
 
         self.signals.new_message = False
@@ -119,23 +113,23 @@ class AbstractLLMWrapper:
 
         try:
             # PASO 1: Obtener respuesta COMPLETA del LLM (blocking)
-            logger.info("Solicitando respuesta al LLM...")
+            print("Solicitando respuesta al LLM...")
             full_text = self.agent.chat(prompt_data)  # ← Retorna STRING directamente
 
             # Verificar cancelación
             if self.llm_state.next_cancelled:
-                logger.info("Generación cancelada")
+                print("Generación cancelada")
                 self.llm_state.next_cancelled = False
                 self.signals.AI_thinking = False
                 return
 
-            logger.info(f"Respuesta recibida: {len(full_text)} caracteres")
-            logger.debug(f"Texto: '{full_text}...'")
+            print(f"Respuesta recibida: {len(full_text)} caracteres")
+            print(f"Texto: '{full_text}...'")
 
             # Filtrado
             if self.is_filtered(full_text):
                 full_text = "Sin comentarios..."
-                logger.warning("Respuesta filtrada por lista negra")
+                print("Respuesta filtrada por lista negra")
 
             # Guardar en historial
             self.signals.history.append({"role": "assistant", "content": full_text})
@@ -144,21 +138,21 @@ class AbstractLLMWrapper:
             # self.signals.sio_queue.put(("next_chunk", full_text))
 
             # PASO 2: Enviar texto completo al TTS (blocking generator)
-            logger.info("Enviando texto al TTS...")
+            print("Enviando texto al TTS...")
             self.signals.AI_thinking = False  # Ya no está pensando
 
             # TTS retorna un generator de chunks de audio
             audio_chunk = self.tts.synthesize_full(full_text,save_path=".demos/temp/"+ str(time.time()) +".wav")
 
             if self.llm_state.next_cancelled:
-                logger.info("TTS cancelado")
+                print("TTS cancelado")
                 return
             self.signals.audio_ready = True
             self.signals.audio_queue.put(audio_chunk)
-            logger.info("Primer chunk de audio disponible para el bot")
+            print("Primer chunk de audio disponible para el bot")
 
         except Exception as e:
-            logger.error(f"Error durante prompt(): {e}", exc_info=True)
+            print(f"Error durante prompt(): {e}")
 
         finally:
             self.signals.AI_thinking = False
