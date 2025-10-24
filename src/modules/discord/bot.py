@@ -2,10 +2,11 @@ import asyncio
 import io
 import os
 import time
-
+import numpy as np
 import discord
 from discord.ext import commands, voice_recv
 
+from src.audio_parser import StreamingAudio
 from src.com.model.enums import EventType
 from src.module import Module
 import env
@@ -46,25 +47,34 @@ class DiscordClient(Module):
         self.signals.process_text = False
         return None
 
+
     async def _play_from_queue(self):
-        """Lee chunks de audio desde la queue y los envía al canal de voz."""
+        """Lee audio completo (PCM 16-bit mono 48kHz) desde la cola y lo reproduce."""
         print("[DEBUG] _play_from_queue() iniciado")
+
         while not self.signals.terminate:
             try:
-                # Espera un chunk desde el hilo TTS
-                chunk = await asyncio.get_event_loop().run_in_executor(None, self.signals.audio_queue.get)
+                # Esperar audio desde la cola (bloque único)
+                audio_bytes = await asyncio.get_event_loop().run_in_executor(None, self.signals.audio_queue.get)
 
-                if chunk is None or not self.vc or not self.vc.is_connected():
+                if not audio_bytes or not self.vc or not self.vc.is_connected():
                     await asyncio.sleep(0.05)
                     continue
-                print("[DEBUG] Reproduciendo chunk de audio desde la queue")
-                # reproducir chunk (PCM raw)
-                # audio = discord.PCMAudio(io.BytesIO(chunk))  # usa FFmpeg si es necesario
-                self.vc.play(chunk)
 
-                # esperar hasta que acabe antes del siguiente
+                # Convertir mono → estéreo
+                audio = np.frombuffer(audio_bytes, dtype=np.int16)
+                stereo = np.repeat(audio[:, None], 2, axis=1).ravel().astype(np.int16)
+                stereo_bytes = stereo.tobytes()
+
+                # Crear un objeto PCMAudio para Discord
+                source = discord.PCMAudio(io.BytesIO(stereo_bytes))
+
+                print("[DEBUG] Reproduciendo audio completo (PCM LINEAR16 -> estéreo 48kHz)")
+                self.vc.play(source)
+
+                # Esperar a que termine
                 while self.vc.is_playing():
-                    await asyncio.sleep(0.02)
+                    await asyncio.sleep(0.05)
 
             except Exception as e:
                 print(f"[ERROR] en _play_from_queue: {e}")
@@ -89,6 +99,20 @@ class DiscordClient(Module):
         # async def finished_callback(sink, channel: discord.TextChannel, *args):
         #     await sink.vc.disconnect()
         #     await channel.send("Finished!")
+        @bot.command(name="chat", description="Send message to AI")
+        async def chat(ctx, *args ):
+            """Send a message to the AI."""
+            print(f"[DEBUG] chat() llamado con args: {' '.join(args)}")
+            if len(' '.join(args)) > 6:
+                text = ' '.join(args)
+                self.signals.process_text = True
+                user = {
+                    "id": ctx.author.id,
+                    "name": ctx.author.name
+                }
+                print(f"[DEBUG] Procesando fragmento desde chat(): {text}")
+                self.manager.process_fragment(user, text)
+                self.signals.process_text = False
 
         @bot.command(name="start", description="Bot will join your vc")
         async def start(ctx):

@@ -25,3 +25,4 @@ python -m pip install discord-ext-voice-recv
 pip install discord-ext-voice-recv[extras_thing]
 pip install SpeechRecognition
 pip install google-cloud-texttospeech
+ pip install pydub

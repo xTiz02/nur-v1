@@ -16,6 +16,7 @@ from vertexai.generative_models import GenerativeModel, HarmCategory, HarmBlockT
 import env
 from src.injection import Injection
 
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 class AbstractLLMWrapper:
@@ -129,7 +130,7 @@ class AbstractLLMWrapper:
                 return
 
             logger.info(f"Respuesta recibida: {len(full_text)} caracteres")
-            logger.debug(f"Texto: '{full_text[:100]}...'")
+            logger.debug(f"Texto: '{full_text}...'")
 
             # Filtrado
             if self.is_filtered(full_text):
@@ -140,41 +141,21 @@ class AbstractLLMWrapper:
             self.signals.history.append({"role": "assistant", "content": full_text})
 
             # Enviar a UI
-            self.signals.sio_queue.put(("next_chunk", full_text))
+            # self.signals.sio_queue.put(("next_chunk", full_text))
 
             # PASO 2: Enviar texto completo al TTS (blocking generator)
             logger.info("Enviando texto al TTS...")
             self.signals.AI_thinking = False  # Ya no está pensando
 
             # TTS retorna un generator de chunks de audio
-            audio_generator = self.tts.synthesize_streaming(full_text)
+            audio_chunk = self.tts.synthesize_full(full_text,save_path=".demos/temp/"+ str(time.time()) +".wav")
 
-            # PASO 3: Procesar chunks de audio y ponerlos en cola
-            chunk_count = 0
-            first_chunk = True
-
-            for audio_chunk in audio_generator:  # ← Generator SÍNCRONO
-                # Verificar cancelación
-                if self.llm_state.next_cancelled:
-                    logger.info("TTS cancelado")
-                    break
-
-                if audio_chunk:
-                    chunk_count += 1
-
-                    # Poner en cola para el bot
-                    process = self.tts.process_audio_chunk(audio_chunk)
-                    self.signals.audio_queue.put(process)
-
-                    # Señalizar primer chunk
-                    if first_chunk:
-                        self.signals.audio_ready = True
-                        logger.info("Primer chunk de audio disponible para el bot")
-                        first_chunk = False
-
-                    logger.debug(f"Chunk #{chunk_count} encolado: {len(audio_chunk)} bytes")
-
-            logger.info(f"TTS completado: {chunk_count} chunks de audio enviados")
+            if self.llm_state.next_cancelled:
+                logger.info("TTS cancelado")
+                return
+            self.signals.audio_ready = True
+            self.signals.audio_queue.put(audio_chunk)
+            logger.info("Primer chunk de audio disponible para el bot")
 
         except Exception as e:
             logger.error(f"Error durante prompt(): {e}", exc_info=True)

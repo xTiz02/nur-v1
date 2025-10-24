@@ -9,7 +9,7 @@ from src.modules.llm.llm_interface import LLMInterface
 from utils.constans import *
 import env
 
-
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 

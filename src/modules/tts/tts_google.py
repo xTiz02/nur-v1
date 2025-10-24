@@ -2,7 +2,9 @@ import io
 import itertools
 import logging
 import subprocess
+from pathlib import Path
 
+import numpy as np
 from google.cloud import texttospeech
 from pydub import AudioSegment
 
@@ -17,7 +19,7 @@ class GoogleTTSEngine:
         language: str = "es-US",
         voice_name: str = "es-US-Journey-F",
         sample_rate_hz: int = 48000,
-        speaking_rate: float = 1.2,
+        speaking_rate: float = 1,
     ):
         self.client = texttospeech.TextToSpeechClient()
         self.default_language = language
@@ -25,7 +27,8 @@ class GoogleTTSEngine:
         self.sample_rate_hz = sample_rate_hz
         self.speaking_rate = speaking_rate
         self.audio_config = texttospeech.StreamingAudioConfig(
-            audio_encoding=texttospeech.AudioEncoding.OGG_OPUS,
+            audio_encoding=texttospeech.AudioEncoding.PCM,
+            sample_rate_hertz=48000,
         )
 
         self.streaming_config = texttospeech.StreamingSynthesizeConfig(
@@ -80,59 +83,46 @@ class GoogleTTSEngine:
         except Exception as e:
             logger.error(f"Error en síntesis: {e}", exc_info=True)
 
-    def process_audio_chunk(self, audio_chunk: bytes) -> bytes:
+# -------------------- MODO COMPLETO --------------------
+    def synthesize_full(self, text: str, *, language: str = None, voice: str = None, save_path: str = None) -> bytes:
         """
-        Procesa un chunk de audio recibido del stream.
-        Aquí puedes agregar procesamiento adicional si es necesario.
-        """
-        return self._ogg_to_pcm48(audio_chunk)
+        Sintetiza texto completo y retorna todo el audio en un solo bloque PCM 16-bit.
+        Si 'save_path' está definido, guarda el audio como WAV.
 
-    import subprocess
+        Returns:
+            Bytes de audio PCM
+        """
+        language = language or self.default_language
+        voice = voice or self.default_voice_name
 
-    def _ogg_to_pcm48(self, audio_bytes: bytes) -> bytes:
-        """
-        Convierte audio OGG_OPUS → PCM 16-bit mono 48kHz (raw)
-        usando ffmpeg en memoria.
-        """
-        process = subprocess.Popen(
-            ["ffmpeg", "-i", "pipe:0", "-f", "s16le", "-acodec", "pcm_s16le",
-             "-ac", "1", "-ar", "48000", "pipe:1"],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
-        )
-        pcm_data, _ = process.communicate(audio_bytes)
-        return pcm_data
+        try:
+            synthesis_input = texttospeech.SynthesisInput(text=text)
+            voice_params = texttospeech.VoiceSelectionParams(
+                language_code=language, name=voice
+            )
+            audio_config = texttospeech.AudioConfig(
+                audio_encoding=texttospeech.AudioEncoding.LINEAR16,
+                sample_rate_hertz=self.sample_rate_hz,
+                speaking_rate=self.speaking_rate,
+            )
 
-    def convert_audio_with_pydub(self, audio_bytes: bytes,
-        input_format="ogg") -> bytes:
-        """
-        Convierte audio (OGG, MP3, etc.) a PCM 16-bit estéreo 48kHz (raw).
-        """
-        # Cargar desde bytes en formato OGG
-        audio = AudioSegment.from_file(io.BytesIO(audio_bytes),
-                                       format=input_format)
+            logger.info(f"[TTS] Sintetizando (modo completo): {len(text)} caracteres")
+            response = self.client.synthesize_speech(
+                input=synthesis_input, voice=voice_params, audio_config=audio_config
+            )
 
-        # Convertir a estéreo 48kHz
-        audio = audio.set_channels(2)
-        audio = audio.set_frame_rate(48000)
+            audio_bytes = response.audio_content
+            logger.debug(f"[TTS] Recibido audio: {len(audio_bytes)} bytes")
 
-        # Exportar como PCM 16-bit (raw)
-        raw_bytes = audio.raw_data
-        return raw_bytes
+            # Guardar archivo si se indicó una ruta
+            if save_path:
+                Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+                with open(save_path, "wb") as f:
+                    f.write(audio_bytes)
+                logger.info(f"[TTS] Audio guardado en: {save_path}")
 
-    def decode_ogg_to_pcm48(self, audio_bytes: bytes) -> bytes:
-        """
-        Convierte audio OGG_OPUS → PCM 16-bit mono 48kHz en memoria (usando ffmpeg).
-        """
-        process = subprocess.Popen(
-            [
-                "ffmpeg", "-f", "ogg", "-i", "pipe:0",  # entrada ogg desde stdin
-                "-f", "s16le", "-acodec", "pcm_s16le",  # salida PCM 16-bit
-                "-ac", "2", "-ar", "48000",             # estéreo, 48kHz
-                "pipe:1"
-            ],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-        )
-        pcm_data, _ = process.communicate(audio_bytes)
-        return pcm_data
+            return audio_bytes
+
+        except Exception as e:
+            logger.error(f"[TTS] Error en síntesis completa: {e}", exc_info=True)
+            return b""
