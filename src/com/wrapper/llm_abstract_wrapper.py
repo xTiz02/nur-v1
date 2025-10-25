@@ -116,12 +116,13 @@ class AbstractLLMWrapper:
             print("Solicitando respuesta al LLM...")
             full_text = self.agent.chat(prompt_data)  # ← Retorna STRING directamente
 
-            # Verificar cancelación
-            if self.llm_state.next_cancelled:
-                print("Generación cancelada")
-                self.llm_state.next_cancelled = False
-                self.signals.AI_thinking = False
-                return
+            # # Verificar cancelación
+            # if self.llm_state.next_cancelled:
+            #     print("Generación cancelada")
+            #     self.llm_state.next_cancelled = False
+            #     self.signals.AI_thinking = False
+            #     self.signals.AI_speaking = False
+            #     return
 
             print(f"Respuesta recibida: {len(full_text)} caracteres")
             print(f"Texto: '{full_text}...'")
@@ -132,28 +133,31 @@ class AbstractLLMWrapper:
                 print("Respuesta filtrada por lista negra")
 
             # Guardar en historial
-            self.signals.history.append({"role": "assistant", "content": full_text})
+            # self.signals.history.append({"role": "assistant", "content": full_text})
 
             # Enviar a UI
-            # self.signals.sio_queue.put(("next_chunk", full_text))
+            self.signals.sio_queue.put(("next_chunk", full_text))
 
             # PASO 2: Enviar texto completo al TTS (blocking generator)
-            print("Enviando texto al TTS...")
-            self.signals.AI_thinking = False  # Ya no está pensando
+            if self.signals.tts_ready:
+                print("Enviando texto al TTS...")
+                self.signals.AI_thinking = False  # Ya no está pensando
+                self.signals.AI_speaking = True
 
-            # TTS retorna un generator de chunks de audio
-            audio_chunk = self.tts.synthesize_full(full_text,save_path=".demos/temp/"+ str(time.time()) +".wav")
+                # TTS retorna un generator de chunks de audio
+                audio_chunk = self.tts.synthesize_full(full_text,save_path=".demos/temp/"+ str(time.time()) +".wav")
 
-            if self.llm_state.next_cancelled:
-                print("TTS cancelado")
-                return
-            self.signals.audio_ready = True
-            self.signals.audio_queue.put(audio_chunk)
-            print("Primer chunk de audio disponible para el bot")
+                if self.llm_state.next_cancelled:
+                    print("TTS cancelado")
+                    return
+                self.signals.audio_ready = True
+                self.signals.audio_queue.put(audio_chunk)
+                print("Primer chunk de audio disponible para el bot")
+
 
         except Exception as e:
             print(f"Error durante prompt(): {e}")
-
+            self.signals.AI_speaking = False
         finally:
             self.signals.AI_thinking = False
             self.signals.last_message_time = time.time()

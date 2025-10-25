@@ -18,6 +18,10 @@ class Prompter:
         self.timeSinceLastMessage = 0.0
 
     def prompt_now(self):
+        print(self.signals.tts_ready)
+        print(self.signals.new_message)
+        if not self.signals.tts_ready and self.signals.new_message:
+            return True
         # No generar prompts si el sistema no está listo
         # if not self.signals.stt_ready or not self.signals.tts_ready:
         #     return False
@@ -45,23 +49,23 @@ class Prompter:
                 time.sleep(1)
 
             current_time = time.time()
-            # Setear el tiempo del último mensaje si es 0 o si el sistema no está listo
-            if self.signals.last_message_time == 0.0 or (not self.signals.stt_ready or not self.signals.tts_ready):
-                # self.signals.last_message_time = time.time()
-                self.timeSinceLastMessage = 0.0
-            else:
-                if not self.system_ready:
-                    print("SYSTEM READY")
-                    self.system_ready = True
-
-            # Calcular el tiempo desde el último mensaje
-            if self.signals.new_message:
-                last_fragment = self.manager.get_last_message()
-                self.timeSinceLastMessage = current_time - last_fragment.timestamp
-
-            self.signals.sio_queue.put(("patience_update", {"crr_time": self.timeSinceLastMessage, "total_time": PATIENCE}))
+            if self.signals.tts_ready:
+                # Setear el tiempo del último mensaje si es 0 o si el sistema no está listo
+                if self.signals.last_message_time == 0.0 or (not self.signals.stt_ready or not self.signals.tts_ready):
+                    # self.signals.last_message_time = time.time()
+                    self.timeSinceLastMessage = 0.0
+                else:
+                    if not self.system_ready:
+                        print("SYSTEM READY")
+                        self.system_ready = True
+                # Calcular el tiempo desde el último mensaje
+                if self.signals.new_message:
+                    last_fragment = self.manager.get_last_message()
+                    self.timeSinceLastMessage = current_time - last_fragment.timestamp
+                self.signals.sio_queue.put(("patience_update", {"crr_time": self.timeSinceLastMessage, "total_time": PATIENCE}))
 
             # Decide and prompt LLM
+            print("Checking if should prompt LLM...")
             if self.prompt_now():
                 print("PROMPTING AI")
                 if self.signals.new_message:

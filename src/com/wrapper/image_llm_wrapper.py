@@ -32,7 +32,7 @@ class ImageLLMWrapper(AbstractLLMWrapper):
         # base64
         frame_base64 = base64.b64encode(frame_encoded).decode("utf-8")
         # guardar imagen en una capeta temporal
-        path_uri = "demos/temp"
+        path_uri = ".demos/temp"
         if not os.path.exists(path_uri):
             os.makedirs(path_uri)
         name = str(int(time.time())) + ".jpg"

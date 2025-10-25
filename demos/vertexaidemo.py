@@ -14,9 +14,9 @@ class GoogleTTSEngine:
     def __init__(
         self,
         language: str = "es-US",
-        voice_name: str = "es-US-Journey-F",
+        voice_name: str = "es-US-Chirp3-HD-Zephyr",
         sample_rate_hz: int = 48000,
-        speaking_rate: float = 1,
+        speaking_rate: float = 1.1,
     ):
         self.client = texttospeech.TextToSpeechClient()
         self.default_language = language
