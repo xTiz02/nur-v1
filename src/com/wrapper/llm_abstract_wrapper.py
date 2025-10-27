@@ -45,7 +45,7 @@ class AbstractLLMWrapper:
             injections = []
 
         for module in self.modules.values():
-            injections.append(module.get_prompt_injection())
+            injections.append(module.get_prompt_injection)
 
         # Limpia todos los módulos una vez que se ha obtenido la inyección de prompt de todos los módulos
         for module in self.modules.values():

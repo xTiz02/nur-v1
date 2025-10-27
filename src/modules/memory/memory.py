@@ -39,27 +39,30 @@ class Memory(Module):
         #     print("MEMORY: No memories found in database. Importing from memoryinit.json")
         #     self.API.import_json(path="./memories/memoryinit.json")
 
+    @property
     def get_prompt_injection(self):
         # Use recent messages and twitch messages to query the database for related memories
-        query = ""
+        prompt = ""
+        history = self.signals.history[-1]
+        if history:
+            list_current: List[Fragment] = history["current"]
+            ai_response: str = history["ai_response"]
 
-        for message in self.signals.recentTwitchMessages:
-            query += message + "\n"
+            if len(list_current) > 0:
+                for fragment in list_current:
+                    prompt += fragment.display_name + ": " + fragment.message + "\n"
+            if ai_response != "":
+                prompt += "AI response: " + "\n" + AI_NAME + ": " + ai_response + "\n"
 
-        for message in self.signals.history[-1]:
-            if message["role"] == "user" and message["content"] != "":
-                query += HOST_NAME + ": " + message["content"] + "\n"
-            elif message["role"] == "assistant" and message["content"] != "":
-                query += AI_NAME + ": " + message["content"] + "\n"
 
-        memories = self.collection.query(query_texts=query, n_results=MEMORY_RECALL_COUNT)
+
+        memories = self.repo.search_by_vector(query=prompt, limit=MEMORY_RECALL_COUNT)
 
         # Generate injection for LLM prompt
-
-        self.prompt_injection.text = f"{AI_NAME} knows these things:\n"
-        for i in range(len(memories["ids"][0])):
-            self.prompt_injection.text += memories['documents'][0][i] + "\n"
-        self.prompt_injection.text += "End of knowledge section\n"
+        self.prompt_injection.text = f"{AI_NAME} recuerda estas cosas:\n"
+        for memory in memories:
+            self.prompt_injection.text += memory["content"] + "\n"
+        self.prompt_injection.text += "Fin de la sección de memoria\n"
 
         return self.prompt_injection
 

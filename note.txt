@@ -31,7 +31,7 @@ pip install google-cloud-texttospeech
    pip install psycopg2
  pip install pydub
 
-
+gcloud auth application-default login
 
 
 

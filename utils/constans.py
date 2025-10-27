@@ -9,6 +9,7 @@ MULTIMODAL_STRATEGY: MultiModalEventType = MultiModalEventType.NORMAL
 PATIENCE = 2.0  # segundos de espera tras último fragmento para considerar finalizado el mensaje por discord
 PRIMARY_MONITOR = 0
 MEMORY_QUERY_MESSAGE_COUNT = 10
+MEMORY_RECALL_COUNT = 5
 SYSTEM_PROMPT = '''
 Continúa el diálogo del chat a continuación. Escribe solo una respuesta para el personaje "Luna" sin comillas.
 
