@@ -1,0 +1,37 @@
+🧠 Lo que realmente pasa detrás (y lo que tú acabas de entender)
+
+1️⃣ El streamer (host) inicia su sesión de Live Share.
+
+Comparte el entorno de trabajo, archivos, cursores, etc.
+
+No expone su máquina ni permite que nadie ejecute código localmente.
+
+2️⃣ La IA (cliente) arranca su propia instancia de VS Code, pero con:
+
+🔹 Una extensión personalizada (creada por el desarrollador del bot).
+
+🔹 Esa extensión usa el API vscode para escuchar eventos y modificar archivos.
+
+🔹 Se conecta automáticamente a la sesión de Live Share del host (como si fuera un colaborador humano).
+
+3️⃣ Como resultado:
+
+La IA ve todo el código, posición del cursor, estructura del proyecto, etc.
+
+Puede usar la API del propio VS Code (de su instancia) para:
+
+Editar archivos (workspace.applyEdit, TextEditor.edit...)
+
+Crear nuevos archivos
+
+Ejecutar comandos del IDE (commands.executeCommand)
+
+Leer el estado del proyecto (workspace.onDidChangeTextDocument, etc.)
+
+Y todo lo que haga se sincroniza en tiempo real con la sesión del streamer a través de Live Share.
+
+4️⃣ El host solo observa, porque Live Share replica lo que hace la IA.
+
+En el stream, parece que la IA está “tecleando sola” dentro del editor del streamer.
+
+Pero realmente la IA está modificando su propio entorno local, y Live Share sincroniza los cambios.
