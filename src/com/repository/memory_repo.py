@@ -19,7 +19,7 @@ class PgVectorRepository:
         password: str,
         host: str = "localhost",
         port: str = "5432",
-        table_name: str = "py_vector_store",
+        table_name: str = "db_vector_store2",
         embedding_model: str = "nomic-embed-text",
         embedding_dimension: int = 768
     ):
@@ -88,8 +88,8 @@ class PgVectorRepository:
         Returns:
             List of floats representing the embedding vector
         """
-        response = ollama.embeddings(model=self.embedding_model, prompt=text)
-        return response["embedding"]
+        response = ollama.embed(model=self.embedding_model, input=text)
+        return response["embeddings"][0]
 
     def insert_document(
         self,
@@ -111,6 +111,7 @@ class PgVectorRepository:
         if embedding is None:
             embedding = self.generate_embedding(content)
 
+        print(embedding)
         if metadata is None:
             metadata = {}
 
@@ -156,7 +157,7 @@ class PgVectorRepository:
                         INSERT INTO {self.table_name} (content, metadata, embedding) 
                         VALUES (%s, %s, %s) RETURNING id
                         """,
-                        (content, json.dumps(metadata), embedding)
+                        (content, json.dumps(metadata), embedding,),
                     )
                     doc_id = cur.fetchone()[0]
                     inserted_ids.append(str(doc_id))
@@ -360,46 +361,46 @@ class PgVectorRepository:
 
 
 # Example usage
-if __name__ == "__main__":
-    # Initialize repository
-    repo = PgVectorRepository(
-        database="vector",
-        user="user",
-        password="pass",
-        host="localhost",
-        port="5432"
-    )
-
-    # Initialize database
-    repo.initialize_database()
-
-    # Insert documents
-    documents = [
-        {
-            "content": "Llamas are members of the camelid family",
-            "metadata": {"category": "biology", "index": 0}
-        },
-        {
-            "content": "Llamas were first domesticated 4,000 to 5,000 years ago",
-            "metadata": {"category": "history", "index": 1}
-        }
-    ]
-
-    ids = repo.insert_documents_batch(documents)
-    print(f"Inserted documents: {ids}")
-
-    # Search by query
-    results = repo.search_by_vector("Tell me about llamas", limit=3)
-    print("\nSearch results:")
-    for result in results:
-        print(
-            f"- {result['content'][:50]}... (similarity: {result['similarity']:.3f})")
-
-    # Search by tokens
-    token_results = repo.search_by_tokens(["llamas", "domesticated"], limit=2)
-    print("\nToken search results:")
-    for result in token_results:
-        print(f"- {result['content'][:50]}...")
-
-    # Get document count
-    print(f"\nTotal documents: {repo.count_documents()}")
+# if __name__ == "__main__":
+#     # Initialize repository
+#     repo = PgVectorRepository(
+#         database="vector",
+#         user="user",
+#         password="pass",
+#         host="localhost",
+#         port="5432"
+#     )
+#
+#     # Initialize database
+#     repo.initialize_database()
+#
+#     # Insert documents
+#     documents = [
+#         {
+#             "content": "Llamas are members of the camelid family",
+#             "metadata": {"category": "biology", "index": 0}
+#         },
+#         {
+#             "content": "Llamas were first domesticated 4,000 to 5,000 years ago",
+#             "metadata": {"category": "history", "index": 1}
+#         }
+#     ]
+#
+#     ids = repo.insert_documents_batch(documents)
+#     print(f"Inserted documents: {ids}")
+#
+#     # Search by query
+#     results = repo.search_by_vector("Tell me about llamas", limit=3)
+#     print("\nSearch results:")
+#     for result in results:
+#         print(
+#             f"- {result['content'][:50]}... (similarity: {result['similarity']:.3f})")
+#
+#     # Search by tokens
+#     token_results = repo.search_by_tokens(["llamas", "domesticated"], limit=2)
+#     print("\nToken search results:")
+#     for result in token_results:
+#         print(f"- {result['content'][:50]}...")
+#
+#     # Get document count
+#     print(f"\nTotal documents: {repo.count_documents()}")

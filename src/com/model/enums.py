@@ -21,6 +21,8 @@ class EventType(Enum):
     TTS_FINISHED = "tts_finished"
     FRAGMENT_ADDED = "fragment_added"
 
+    NEXT_CHUNK = "next_chunk"
+
 
 class MultiModalEventType(Enum):
     NORMAL = "normal"

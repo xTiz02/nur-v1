@@ -18,8 +18,6 @@ class Prompter:
         self.timeSinceLastMessage = 0.0
 
     def prompt_now(self):
-        print(self.signals.tts_ready)
-        print(self.signals.new_message)
         if not self.signals.tts_ready and self.signals.new_message:
             return True
         # No generar prompts si el sistema no está listo
@@ -37,8 +35,10 @@ class Prompter:
 
     def choose_llm(self):
         if "multimodal" in self.modules and self.modules["multimodal"].API.multimodal_now():
+            print(f"Choosing IMAGE LLM")
             return self.llms["image"]
         else:
+            print(f"Choosing TEXT LLM")
             return self.llms["text"]
 
     def prompt_loop(self):
@@ -65,7 +65,7 @@ class Prompter:
                 self.signals.sio_queue.put(("patience_update", {"crr_time": self.timeSinceLastMessage, "total_time": PATIENCE}))
 
             # Decide and prompt LLM
-            print("Checking if should prompt LLM...")
+            # print("Checking if should prompt LLM...")
             if self.prompt_now():
                 print("PROMPTING AI")
                 if self.signals.new_message:

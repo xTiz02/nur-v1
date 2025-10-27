@@ -6,6 +6,7 @@ import threading
 import asyncio
 
 from src.com.wrapper.llm_state import LLMState
+from src.modules.memory.memory import Memory
 from src.modules.tts.tts_google import GoogleTTSEngine
 from utils.constans import *
 import env
@@ -85,8 +86,7 @@ async def main():
         model_name=env.MODEL_NAME,
         enabled_session=True)
     memory_agent= VertexAgentEngine(
-        system_instruction=MEMORY_PROMPT,
-        model_name=env.MODEL_NAME,
+        model_name=env.MEMORY_MODEL_NAME,
         enabled_session=False)
     tts = GoogleTTSEngine()
     llms = {
@@ -110,7 +110,7 @@ async def main():
     # Create Vtube Studio plugin
     # modules['vtube_studio'] = VtubeStudio(signals, enabled=True)
     # Create Multimodal module
-    modules['multimodal'] = MultiModal(signals, enabled=False)
+    modules['multimodal'] = MultiModal(signals, enabled=True)
     # Create Custom Prompt module
     # modules['custom_prompt'] = CustomPrompt(signals, enabled=True)
     # Create Memory module

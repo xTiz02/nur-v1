@@ -1,7 +1,11 @@
-from modules.module import Module
-from constants import *
-from chromadb.config import Settings
-import chromadb
+from typing import List
+
+from vertexai.agent_engines import AgentEngine
+
+from src.com.model.models import Fragment
+from src.module import Module
+from src.modules.llm.vertext_llm import VertexAgentEngine
+from utils.constans import *
 import requests
 import json
 import uuid
@@ -13,13 +17,13 @@ from src.com.repository.memory_repo import PgVectorRepository
 
 class Memory(Module):
 
-    def __init__(self, signals, enabled=True):
+    def __init__(self, signals, agent: VertexAgentEngine, enabled=True):
         super().__init__(signals, enabled)
 
         self.API = self.API(self)
         self.prompt_injection.text = ""
         self.prompt_injection.priority = 60
-
+        self.agent = agent
         self.processed_count = 0
         self.repo = PgVectorRepository(
             database="vector",
@@ -42,7 +46,7 @@ class Memory(Module):
         for message in self.signals.recentTwitchMessages:
             query += message + "\n"
 
-        for message in self.signals.history[-MEMORY_QUERY_MESSAGE_COUNT:]:
+        for message in self.signals.history[-1]:
             if message["role"] == "user" and message["content"] != "":
                 query += HOST_NAME + ": " + message["content"] + "\n"
             elif message["role"] == "assistant" and message["content"] != "":
@@ -66,45 +70,34 @@ class Memory(Module):
         # conversation, and it is converted into a memory so that it can be recalled later.
         while not self.signals.terminate:
             if self.processed_count > len(self.signals.history):
+                print(f"Se reinició el conteo de mensajes procesados de memoria de {self.processed_count} a 0")
                 self.processed_count = 0
 
-            if len(self.signals.history) - self.processed_count >= 20:
-                print("MEMORY: Generating new memories")
+            if len(self.signals.history) - self.processed_count >= 10:
+                print("MEMORY: Generando nuevas memorias a partir del historial reciente de chat con la IA.")
+                print(f"MEMORY: Procesados {self.processed_count} mensajes, total en historial {len(self.signals.history)}")
 
-                # Copy the latest unprocessed messages
-                messages = copy.deepcopy(self.signals.history[-(len(self.signals.history) - self.processed_count):])
+                chat_section = "Mensajes de usuarios: \n"
+                for history in self.signals.history[-MEMORY_QUERY_MESSAGE_COUNT:]:
+                    list_current: List[Fragment] = history["current"]
+                    ai_response: str = history["ai_response"]
 
-                for message in messages:
-                    if message["role"] == "user" and message["content"] != "":
-                        message["content"] = HOST_NAME + ": " + message["content"] + "\n"
-                    elif message["role"] == "assistant" and message["content"] != "":
-                        message["content"] = AI_NAME + ": " + message["content"] + "\n"
+                    if len(list_current) > 0:
+                        for fragment in list_current:
+                            chat_section += fragment.display_name + ": " + fragment.message + "\n"
+                    if ai_response != "":
+                        chat_section += "AI response: " + "\n" + AI_NAME + ": " + ai_response + "\n"
 
-                chat_section = ""
-                for message in messages:
-                    chat_section += message["content"]
+                prompt = chat_section + MEMORY_PROMPT
 
-                data = {
-                    "mode": "instruct",
-                    "max_tokens": 200,
-                    "skip_special_tokens": False,  # Necessary for Llama 3
-                    "custom_token_bans": BANNED_TOKENS,
-                    "stop": STOP_STRINGS.remove("\n"),
-                    "messages": [{
-                        "role": "user",
-                        "content": chat_section + MEMORY_PROMPT
-                    }]
-                }
-                headers = {"Content-Type": "application/json"}
-
-                response = requests.post(LLM_ENDPOINT + "/v1/chat/completions", headers=headers, json=data, verify=False)
-                raw_memories = response.json()['choices'][0]['message']['content']
+                response = self.agent.memory(prompt)
 
                 # Split each Q&A section and add the new memory to the database
-                for memory in raw_memories.split("{qa}"):
+                for memory in response.split("{qa}"):
                     memory = memory.strip()
                     if memory != "":
-                        self.collection.upsert([str(uuid.uuid4())], documents=[memory], metadatas=[{"type": "short-term"}])
+                        # Store in database vectors
+                        self.repo.generate_embedding(memory)
 
                 self.processed_count = len(self.signals.history)
 

@@ -3,6 +3,7 @@ import time
 from abc import abstractmethod
 from typing import List
 from env import MODEL_NAME
+from src.com.model.enums import EventType
 from src.com.model.models import Fragment
 from src.com.wrapper.llm_state import LLMState
 from src.modules.llm.llm_interface import LLMInterface
@@ -56,7 +57,7 @@ class AbstractLLMWrapper:
         # Ensambla el prompt final
         prompt = ""
         for injection in injections:
-            prompt += injection.text
+            prompt += injection.title + injection.text
         return prompt
 
     def generate_prompt(self):
@@ -78,12 +79,16 @@ class AbstractLLMWrapper:
 
             generation_prompt = AI_NAME + ": "
 
-            base_injections = [ Injection(chat_section, 100), Injection(pending_chat_section, 110)]
+            base_injections = [ Injection(chat_section, 100,
+                                          "Sección de chat de la conversación actual:"),
+                                Injection(pending_chat_section, 110,
+                                          "Sección de mensajes pendientes que escuchaste mientras hablabas y no respondiste antes:")]
             full_prompt = self.assemble_injections(base_injections) + generation_prompt
 
             self.signals.sio_queue.put(("full_prompt", full_prompt))
             print(f"FULL PROMPT:\n{full_prompt}\n---END OF PROMPT---")
             return full_prompt
+        return  None
 
     @abstractmethod
     def prepare_payload(self):
@@ -104,6 +109,7 @@ class AbstractLLMWrapper:
         # Preparar datos
         if self.signals.new_message:
             prompt_data = self.prepare_payload()
+            print(f"Prepared prompt data for LLM: {prompt_data}...")
         else:
             print("No new message to process")
             return
@@ -115,7 +121,8 @@ class AbstractLLMWrapper:
             # PASO 1: Obtener respuesta COMPLETA del LLM (blocking)
             print("Solicitando respuesta al LLM...")
             full_text = self.agent.chat(prompt_data)  # ← Retorna STRING directamente
-
+            # Guardar respuesta en el historial
+            self.signals.history[-1]["ai_response"] = full_text
             # # Verificar cancelación
             # if self.llm_state.next_cancelled:
             #     print("Generación cancelada")
@@ -135,8 +142,7 @@ class AbstractLLMWrapper:
             # Guardar en historial
             # self.signals.history.append({"role": "assistant", "content": full_text})
 
-            # Enviar a UI
-            self.signals.sio_queue.put(("next_chunk", full_text))
+
 
             # PASO 2: Enviar texto completo al TTS (blocking generator)
             if self.signals.tts_ready:
@@ -145,7 +151,7 @@ class AbstractLLMWrapper:
                 self.signals.AI_speaking = True
 
                 # TTS retorna un generator de chunks de audio
-                audio_chunk = self.tts.synthesize_full(full_text,save_path=".demos/temp/"+ str(time.time()) +".wav")
+                audio_chunk = self.tts.synthesize_full(full_text,save_path=".demos/temp/voice/"+ str(time.time()) +".wav")
 
                 if self.llm_state.next_cancelled:
                     print("TTS cancelado")
@@ -153,12 +159,14 @@ class AbstractLLMWrapper:
                 self.signals.audio_ready = True
                 self.signals.audio_queue.put(audio_chunk)
                 print("Primer chunk de audio disponible para el bot")
-
-
+            else:
+                # Enviar a UI
+                self.signals.sio_queue.put((EventType.NEXT_CHUNK, full_text))
         except Exception as e:
             print(f"Error durante prompt(): {e}")
             self.signals.AI_speaking = False
         finally:
+            print(f"Prompt process finished, new history length: {self.signals.history}")
             self.signals.AI_thinking = False
             self.signals.last_message_time = time.time()
 

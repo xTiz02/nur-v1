@@ -11,7 +11,7 @@ import env
 class VertexAgentEngine(LLMInterface):
     def __init__(
             self,
-            system_instruction: str = SYSTEM_PROMPT,
+            system_instruction: str = None,
             model_name: str = env.MODEL_NAME,
             temperature: float = 0.7,
             max_output_tokens: int = 5000,

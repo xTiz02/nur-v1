@@ -10,9 +10,10 @@ Historial de mensajes: 50
 
 
 class Injection:
-    def __init__(self, text, priority):
+    def __init__(self, text, priority, title=""):
         self.text = text
         self.priority = priority
+        self.title = title
 
     def __str__(self):
         return self.text

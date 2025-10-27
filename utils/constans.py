@@ -3,9 +3,12 @@ from enum import Enum
 from src.com.model.enums import MultiModalEventType
 
 AI_NAME = "Luna"
+# para testear los tipos de estrategia multimodal
+# MULTIMODAL_STRATEGY: MultiModalEventType = MultiModalEventType.MULTI_MODAL
 MULTIMODAL_STRATEGY: MultiModalEventType = MultiModalEventType.NORMAL
 PATIENCE = 2.0  # segundos de espera tras último fragmento para considerar finalizado el mensaje por discord
 PRIMARY_MONITOR = 0
+MEMORY_QUERY_MESSAGE_COUNT = 10
 SYSTEM_PROMPT = '''
 Continúa el diálogo del chat a continuación. Escribe solo una respuesta para el personaje "Luna" sin comillas.
 

@@ -16,7 +16,8 @@ class Signals:
         self._tts_ready = False
         self._stt_ready = False
         # self._recentTwitchMessages = []
-        self._history:List[HistoryData] = []
+        # self._history:List[HistoryData] = []
+        self._history = []
 
         self._terminate = False # Este flag indica a todos los hilos que deben terminar inmediatamente
         SignalQueue = Queue[Tuple[EventType, Any]]
